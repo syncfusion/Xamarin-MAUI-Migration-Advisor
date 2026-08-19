@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xamarin Migration Readiness - ContosoExpenses</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f6f8;color:#1c2530;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+h1{font-size:24px;margin:0 0 4px;letter-spacing:-.3px}
+.sub{color:#61707f;font-size:13px;margin-bottom:24px}
+.card{background:#fff;border:1px solid #dfe5ea;border-radius:10px;padding:20px;margin-bottom:18px}
+h2{font-size:15px;margin:0 0 14px;text-transform:uppercase;letter-spacing:.7px;color:#61707f}
+h3{font-size:14px;margin:20px 0 8px}
+.hero{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+.score{width:112px;height:112px;border-radius:50%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;color:#fff;flex-shrink:0}
+.score .n{font-size:34px;font-weight:700;line-height:1}
+.score .l{font-size:10px;text-transform:uppercase;letter-spacing:.9px;opacity:.9}
+.herotext{flex:1;min-width:260px}
+.herotext .band{font-size:19px;font-weight:600;margin-bottom:4px}
+.herotext p{margin:0;color:#61707f;font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:18px}
+.kpi{background:#f8fafb;border:1px solid #e6ebef;border-radius:8px;padding:11px 13px}
+.kpi .n{font-size:20px;font-weight:600}
+.kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:#7a8894;margin-top:1px}
+.alert{border-left:4px solid #d35400;background:#fdf3ec;border-radius:0 8px 8px 0;padding:15px 18px;margin-bottom:18px}
+.alert .big{font-size:20px;font-weight:700;color:#a04000}
+.alert p{margin:6px 0 0;font-size:13px;color:#6b4423}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+td,th{word-break:break-word;overflow-wrap:anywhere}
+th{text-align:left;padding:8px 10px;background:#f8fafb;border-bottom:2px solid #e6ebef;font-size:11px;
+  text-transform:uppercase;letter-spacing:.5px;color:#7a8894}
+td{padding:9px 10px;border-bottom:1px solid #eef2f5;vertical-align:top}
+tr:last-child td{border-bottom:none}
+.sev{display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-size:10.5px;font-weight:600;white-space:nowrap}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+.loc{color:#7a8894;font-size:11.5px}
+.fix{color:#3d4c5a;font-size:12.5px}
+.muted{color:#7a8894}
+details{margin-bottom:10px}
+summary{cursor:pointer;font-weight:600;padding:7px 0;font-size:13.5px}
+summary::marker{color:#9aa7b3}
+.foot{color:#8a97a3;font-size:11.5px;line-height:1.8;margin-top:26px;border-top:1px solid #dfe5ea;padding-top:18px}
+.foot b{color:#61707f}
+.badge{display:inline-block;padding:1px 7px;border-radius:9px;font-size:10.5px;background:#eef2f5;color:#61707f}
+.verify{background:#fff4d6;color:#8a6d00}
+@media print{body{background:#fff}.card{break-inside:avoid;border-color:#ccc}}
+</style></head><body><div class="wrap">
+<h1>Xamarin to .NET MAUI &mdash; Migration Readiness</h1>
+<div class="sub">ContosoExpenses &middot; generated 11 August 2026, 09:47 &middot; analyser v1.0.0, rule set 2026-08-11</div>
+<div class="alert">
+<div class="big">20 days until the Google Play deadline</div>
+<p><b>Google Play:</b> from 31 August 2026, new apps and updates must target Android 16 (API 36); an extension is available to 1 November 2026. Xamarin.Android cannot target API 36.<br>
+<b>App Store:</b> since 28 April 2026, App Store Connect requires builds made with Xcode 26 and the iOS 26 SDK. Xamarin.iOS cannot produce them.<br>
+A Xamarin app is not simply unsupported &mdash; it cannot ship updates to either store.</p>
+</div>
+<div class="card"><div class="hero">
+<div class="score" style="background:#c0392b"><div class="n">18</div><div class="l">Readiness</div></div>
+<div class="herotext">
+<div class="band">Major migration</div>
+<p>Estimated at <b>12&ndash;29 developer-days</b> for the framework migration itself. This covers porting what exists; it excludes new features, redesign, QA cycles and store resubmission. The calculation is shown in full further down.</p>
+</div></div>
+<div class="kpis">
+<div class="kpi"><div class="n" style="color:#c0392b">8</div><div class="l">Critical</div></div>
+<div class="kpi"><div class="n" style="color:#d35400">15</div><div class="l">High</div></div>
+<div class="kpi"><div class="n" style="color:#b7950b">14</div><div class="l">Medium</div></div>
+<div class="kpi"><div class="n">12</div><div class="l">Low</div></div>
+<div class="kpi"><div class="n">6</div><div class="l">Projects</div></div>
+<div class="kpi"><div class="n">21</div><div class="l">Packages</div></div>
+</div></div>
+<div class="card"><h2>Findings</h2>
+<details open><summary><span class="sev" style="background:#c0392b">Critical</span> &nbsp;8 finding(s)</summary>
+<table><tr><th style="width:24%">Issue</th><th style="width:22%">Location</th><th style="width:54%">What to do</th></tr>
+<tr><td><b>Package: Acr.UserDialogs</b><br><span class="loc">Acr.UserDialogs </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: CommunityToolkit.Maui popups + alerts. Acr.UserDialogs is archived with no official MAUI release. Budget a rewrite of every dialog call site.</td></tr>
+<tr><td><b>Package: Xamarin.Android.Support.Design</b><br><span class="loc">Xamarin.Android.Support.Design 28.0.0.3</span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: AndroidX. The Android Support Libraries are end of life. MAUI requires AndroidX equivalents.</td></tr>
+<tr><td><b>Package: Xamarin.Android.Support.v4</b><br><span class="loc">Xamarin.Android.Support.v4 28.0.0.3</span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: AndroidX. The Android Support Libraries are end of life. MAUI requires AndroidX equivalents.</td></tr>
+<tr><td><b>Package: Xamarin.FFImageLoading.Forms</b><br><span class="loc">Xamarin.FFImageLoading.Forms </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: FFImageLoading.Maui (community fork). The original is archived. A community MAUI fork exists; check its maintenance status before depending on it. MAUI Image plus a caching handler covers many cases.</td></tr>
+<tr><td><b>Package: Xamarin.Forms.Platform.UAP</b><br><span class="loc">Xamarin.Forms.Platform.UAP </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: WinUI 3 (net-windows target). UWP is not a .NET MAUI target platform. This is a rewrite, not a migration.</td></tr>
+<tr><td><b>iOS binding project: ContosoExpenses.iOS.Binding</b><br><span class="loc">ContosoExpenses.iOS.Binding</span></td><td class="mono">ContosoExpenses.iOS.Binding/ContosoExpenses.iOS.Binding.csproj<span class="loc">:1</span></td><td class="fix">Binding projects are not converted by the Upgrade Assistant. They must be recreated as .NET for iOS binding projects, and any bound native library needs rebuilding against the current SDK.</td></tr>
+<tr><td><b>iOS extension project: ContosoExpenses.iOS.ShareExtension</b><br><span class="loc">ContosoExpenses.iOS.ShareExtension</span></td><td class="mono">ContosoExpenses.iOS.ShareExtension/ContosoExpenses.iOS.ShareExtension.csproj<span class="loc">:1</span></td><td class="fix">App extensions are not handled by the Upgrade Assistant and must be recreated by hand. Share code with the main app through a class library.</td></tr>
+<tr><td><b>UWP project: ContosoExpenses.UWP</b><br><span class="loc">ContosoExpenses.UWP</span></td><td class="mono">ContosoExpenses.UWP/ContosoExpenses.UWP.csproj<span class="loc">:1</span></td><td class="fix">The .NET Upgrade Assistant does not convert UWP projects. UWP is not a .NET MAUI target platform; the Windows head must be rebuilt on WinUI 3. Treat this as a rewrite with its own estimate.</td></tr>
+</table></details>
+<details open><summary><span class="sev" style="background:#d35400">High</span> &nbsp;15 finding(s)</summary>
+<table><tr><th style="width:24%">Issue</th><th style="width:22%">Location</th><th style="width:54%">What to do</th></tr>
+<tr><td><b>Application.Properties dictionary</b><br><span class="loc">Application.Current.Properties</span></td><td class="mono">ContosoExpenses/App.xaml.cs<span class="loc">:15</span></td><td class="fix">Removed in MAUI. Migrate stored values to Preferences, and write a one-time upgrade path for existing installs or users lose their data.</td></tr>
+<tr><td><b>Application.Properties dictionary</b><br><span class="loc">Application.Current.Properties</span></td><td class="mono">ContosoExpenses/App.xaml.cs<span class="loc">:17</span></td><td class="fix">Removed in MAUI. Migrate stored values to Preferences, and write a one-time upgrade path for existing installs or users lose their data.</td></tr>
+<tr><td><b>Package: Lottie.Forms</b><br><span class="loc">Lottie.Forms 4.0.5</span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: SkiaSharp.Extended.UI.Maui (SKLottieView).</td></tr>
+<tr><td><b>Package: Plugin.Media</b><br><span class="loc">Plugin.Media </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: MediaPicker (Essentials).</td></tr>
+<tr><td><b>Package: Plugin.Permissions</b><br><span class="loc">Plugin.Permissions </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: Permissions (Essentials).</td></tr>
+<tr><td><b>Package: Prism.Forms</b><br><span class="loc">Prism.Forms </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: Prism.Maui. Prism 9 targets MAUI. Navigation registration changes.</td></tr>
+<tr><td><b>Package: Rg.Plugins.Popup</b><br><span class="loc">Rg.Plugins.Popup </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: Mopups. Community successor by the same lineage. API is close but namespaces change.</td></tr>
+<tr><td><b>Package: ZXing.Net.Mobile</b><br><span class="loc">ZXing.Net.Mobile 2.4.1</span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: ZXing.Net.Maui. Rewritten for MAUI; the API is not source-compatible.</td></tr>
+<tr><td><b>Custom renderer registration</b><br><span class="loc">[assembly: ExportRenderer(</span></td><td class="mono">ContosoExpenses.Android/Renderers/CustomEntryRenderer.cs<span class="loc">:7</span></td><td class="fix">Renderers do not exist in .NET MAUI. Rewrite as a handler and register it in MauiProgram with ConfigureMauiHandlers, or use a handler mapping if the change is cosmetic.</td></tr>
+<tr><td><b>Renderer class</b><br><span class="loc">class CustomEntryRenderer : EntryRenderer</span></td><td class="mono">ContosoExpenses.Android/Renderers/CustomEntryRenderer.cs<span class="loc">:10</span></td><td class="fix">Port to a handler. The nearest equivalent of OnElementChanged is CreatePlatformView / ConnectHandler.</td></tr>
+<tr><td><b>Custom renderer registration</b><br><span class="loc">[assembly: ExportRenderer(</span></td><td class="mono">ContosoExpenses.iOS/Renderers/CustomPageRenderer.cs<span class="loc">:5</span></td><td class="fix">Renderers do not exist in .NET MAUI. Rewrite as a handler and register it in MauiProgram with ConfigureMauiHandlers, or use a handler mapping if the change is cosmetic.</td></tr>
+<tr><td><b>Renderer class</b><br><span class="loc">class CustomPageRenderer : PageRenderer</span></td><td class="mono">ContosoExpenses.iOS/Renderers/CustomPageRenderer.cs<span class="loc">:8</span></td><td class="fix">Port to a handler. The nearest equivalent of OnElementChanged is CreatePlatformView / ConnectHandler.</td></tr>
+<tr><td><b>Custom renderer registration</b><br><span class="loc">[assembly: ExportRenderer(</span></td><td class="mono">ContosoExpenses.iOS/Renderers/RoundedButtonRenderer.cs<span class="loc">:5</span></td><td class="fix">Renderers do not exist in .NET MAUI. Rewrite as a handler and register it in MauiProgram with ConfigureMauiHandlers, or use a handler mapping if the change is cosmetic.</td></tr>
+<tr><td><b>Renderer class</b><br><span class="loc">class RoundedButtonRenderer : ButtonRenderer</span></td><td class="mono">ContosoExpenses.iOS/Renderers/RoundedButtonRenderer.cs<span class="loc">:8</span></td><td class="fix">Port to a handler. The nearest equivalent of OnElementChanged is CreatePlatformView / ConnectHandler.</td></tr>
+<tr><td><b>RelativeLayout</b><br><span class="loc">1 occurrence(s)</span></td><td class="mono">ContosoExpenses/Views/ExpenseListPage.xaml<span class="loc">:5</span></td><td class="fix">RelativeLayout lives only in the compatibility namespace, which does not ship in .NET 11. Rebuild with Grid or a custom layout before then.</td></tr>
+</table></details>
+<details><summary><span class="sev" style="background:#b7950b">Medium</span> &nbsp;14 finding(s)</summary>
+<table><tr><th style="width:24%">Issue</th><th style="width:22%">Location</th><th style="width:54%">What to do</th></tr>
+<tr><td><b>MessagingCenter usage</b><br><span class="loc">MessagingCenter.</span></td><td class="mono">ContosoExpenses/App.xaml.cs<span class="loc">:19</span></td><td class="fix">MessagingCenter is obsolete in .NET 9 and later. Move to WeakReferenceMessenger from CommunityToolkit.Mvvm.</td></tr>
+<tr><td><b>Device.RuntimePlatform</b><br><span class="loc">Device.RuntimePlatform</span></td><td class="mono">ContosoExpenses/App.xaml.cs<span class="loc">:11</span></td><td class="fix">The Device class was removed. Use DeviceInfo.Current.Platform.</td></tr>
+<tr><td><b>Device.StartTimer</b><br><span class="loc">Device.StartTimer</span></td><td class="mono">ContosoExpenses/App.xaml.cs<span class="loc">:13</span></td><td class="fix">Use Application.Current.Dispatcher.StartTimer, or a PeriodicTimer.</td></tr>
+<tr><td><b>DependencyService registration</b><br><span class="loc">[assembly: Dependency(</span></td><td class="mono">ContosoExpenses.Android/FileService.cs<span class="loc">:4</span></td><td class="fix">DependencyService is obsolete. Register the implementation in MauiProgram via builder.Services and inject it.</td></tr>
+<tr><td><b>DependencyService resolution</b><br><span class="loc">DependencyService.Get&lt;</span></td><td class="mono">ContosoExpenses/Services/IFileService.cs<span class="loc">:9</span></td><td class="fix">Replace with constructor injection from the MAUI service container.</td></tr>
+<tr><td><b>DependencyService resolution</b><br><span class="loc">DependencyService.Resolve&lt;</span></td><td class="mono">ContosoExpenses/Services/IFileService.cs<span class="loc">:10</span></td><td class="fix">Replace with constructor injection from the MAUI service container.</td></tr>
+<tr><td><b>Platform effect registration</b><br><span class="loc">[assembly: ExportEffect(</span></td><td class="mono">ContosoExpenses.Android/Renderers/ShadowEffect.cs<span class="loc">:6</span></td><td class="fix">Effects still work in MAUI but are legacy. Prefer a handler mapping; if you keep the effect, the registration attribute stays but namespaces change.</td></tr>
+<tr><td><b>PlatformEffect implementation</b><br><span class="loc">class ShadowEffect : PlatformEffect</span></td><td class="mono">ContosoExpenses.Android/Renderers/ShadowEffect.cs<span class="loc">:9</span></td><td class="fix">Consider a handler property mapper instead, which is the maintained path in MAUI.</td></tr>
+<tr><td><b>Package: Syncfusion.Xamarin.SfChart</b><br><span class="loc">Syncfusion.Xamarin.SfChart </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: Syncfusion.Maui.Charts. Syncfusion ships a MAUI equivalent for this control. See the mapping table in this report.</td></tr>
+<tr><td><b>Package: Syncfusion.Xamarin.SfDataGrid</b><br><span class="loc">Syncfusion.Xamarin.SfDataGrid </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: Syncfusion.Maui.DataGrid. Syncfusion ships a MAUI equivalent for this control. See the mapping table in this report.</td></tr>
+<tr><td><b>Package: Syncfusion.Xamarin.SfSchedule</b><br><span class="loc">Syncfusion.Xamarin.SfSchedule </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: Syncfusion.Maui.Scheduler. Syncfusion ships a MAUI equivalent for this control. See the mapping table in this report.</td></tr>
+<tr><td><b>Package: Xamarin.CommunityToolkit</b><br><span class="loc">Xamarin.CommunityToolkit </span></td><td class="mono">NuGet dependencies</td><td class="fix">Replace with: CommunityToolkit.Maui. Not a drop-in: several behaviours and converters were dropped or renamed.</td></tr>
+<tr><td><b>Frame</b><br><span class="loc">2 occurrence(s)</span></td><td class="mono">ContosoExpenses/Views/ExpenseListPage.xaml<span class="loc">:7</span></td><td class="fix">Frame is obsolete from .NET 9. Replace with Border, which gives you StrokeShape and Shadow.</td></tr>
+<tr><td><b>TableView</b><br><span class="loc">1 occurrence(s)</span></td><td class="mono">ContosoExpenses/Views/SettingsPage.xaml<span class="loc">:5</span></td><td class="fix">Supported but lightly maintained. A CollectionView with grouping is usually a better target.</td></tr>
+</table></details>
+<details><summary><span class="sev" style="background:#5d6d7e">Low</span> &nbsp;12 finding(s)</summary>
+<table><tr><th style="width:24%">Issue</th><th style="width:22%">Location</th><th style="width:54%">What to do</th></tr>
+<tr><td><b>Device.BeginInvokeOnMainThread</b><br><span class="loc">Device.BeginInvokeOnMainThread</span></td><td class="mono">ContosoExpenses/App.xaml.cs<span class="loc">:12</span></td><td class="fix">Use MainThread.BeginInvokeOnMainThread.</td></tr>
+<tr><td><b>Xamarin.Forms namespace import</b><br><span class="loc">using Xamarin.Forms;</span></td><td class="mono">ContosoExpenses.Android/FileService.cs<span class="loc">:2</span></td><td class="fix">Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.</td></tr>
+<tr><td><b>Xamarin.Forms namespace import</b><br><span class="loc">using Xamarin.Forms;</span></td><td class="mono">ContosoExpenses.Android/Renderers/CustomEntryRenderer.cs<span class="loc">:4</span></td><td class="fix">Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.</td></tr>
+<tr><td><b>Xamarin.Forms namespace import</b><br><span class="loc">using Xamarin.Forms;</span></td><td class="mono">ContosoExpenses.Android/Renderers/ShadowEffect.cs<span class="loc">:2</span></td><td class="fix">Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.</td></tr>
+<tr><td><b>Xamarin.Forms namespace import</b><br><span class="loc">using Xamarin.Forms;</span></td><td class="mono">ContosoExpenses.iOS/Renderers/CustomPageRenderer.cs<span class="loc">:2</span></td><td class="fix">Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.</td></tr>
+<tr><td><b>Xamarin.Forms namespace import</b><br><span class="loc">using Xamarin.Forms;</span></td><td class="mono">ContosoExpenses.iOS/Renderers/RoundedButtonRenderer.cs<span class="loc">:2</span></td><td class="fix">Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.</td></tr>
+<tr><td><b>Xamarin.Forms namespace import</b><br><span class="loc">using Xamarin.Forms;</span></td><td class="mono">ContosoExpenses/App.xaml.cs<span class="loc">:2</span></td><td class="fix">Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.</td></tr>
+<tr><td><b>Xamarin.Forms namespace import</b><br><span class="loc">using Xamarin.Forms;</span></td><td class="mono">ContosoExpenses/Services/IFileService.cs<span class="loc">:1</span></td><td class="fix">Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.</td></tr>
+<tr><td><b>Xamarin.Forms XAML namespace</b><br><span class="loc">1 occurrence(s)</span></td><td class="mono">ContosoExpenses/Views/ExpenseListPage.xaml<span class="loc">:2</span></td><td class="fix">Change to http://schemas.microsoft.com/dotnet/2021/maui.</td></tr>
+<tr><td><b>StackLayout</b><br><span class="loc">2 occurrence(s)</span></td><td class="mono">ContosoExpenses/Views/ExpenseListPage.xaml<span class="loc">:6</span></td><td class="fix">Still supported, but VerticalStackLayout and HorizontalStackLayout are faster and are the recommended default. Note that default spacing differs from Xamarin.Forms.</td></tr>
+<tr><td><b>ListView</b><br><span class="loc">1 occurrence(s)</span></td><td class="mono">ContosoExpenses/Views/ExpenseListPage.xaml<span class="loc">:13</span></td><td class="fix">Supported, but CollectionView performs better and is where the investment goes.</td></tr>
+<tr><td><b>Xamarin.Forms XAML namespace</b><br><span class="loc">1 occurrence(s)</span></td><td class="mono">ContosoExpenses/Views/SettingsPage.xaml<span class="loc">:2</span></td><td class="fix">Change to http://schemas.microsoft.com/dotnet/2021/maui.</td></tr>
+</table></details>
+</div>
+<div class="card"><h2>Projects</h2><table><tr><th style="width:27%">Project</th><th style="width:24%">Type</th><th style="width:15%">Target</th><th style="width:34%">Path</th></tr>
+<tr><td><b>ContosoExpenses.iOS.Binding</b> <span class="sev" style="background:#c0392b">not auto-converted</span></td><td>iOS binding</td><td class="mono"></td><td class="mono loc">ContosoExpenses.iOS.Binding/ContosoExpenses.iOS.Binding.csproj</td></tr>
+<tr><td><b>ContosoExpenses.iOS.ShareExtension</b> <span class="sev" style="background:#c0392b">not auto-converted</span></td><td>iOS extension, Xamarin.iOS</td><td class="mono"></td><td class="mono loc">ContosoExpenses.iOS.ShareExtension/ContosoExpenses.iOS.ShareExtension.csproj</td></tr>
+<tr><td><b>ContosoExpenses.UWP</b> <span class="sev" style="background:#c0392b">not auto-converted</span></td><td>UWP</td><td class="mono"></td><td class="mono loc">ContosoExpenses.UWP/ContosoExpenses.UWP.csproj</td></tr>
+<tr><td><b>ContosoExpenses</b></td><td>Library / shared</td><td class="mono">netstandard2.0</td><td class="mono loc">ContosoExpenses/ContosoExpenses.csproj</td></tr>
+<tr><td><b>ContosoExpenses.Android</b></td><td>Xamarin.Android</td><td class="mono">v13.0</td><td class="mono loc">ContosoExpenses.Android/ContosoExpenses.Android.csproj</td></tr>
+<tr><td><b>ContosoExpenses.iOS</b></td><td>Xamarin.iOS</td><td class="mono"></td><td class="mono loc">ContosoExpenses.iOS/ContosoExpenses.iOS.csproj</td></tr>
+</table><p class="muted" style="margin-top:12px;font-size:12.5px">Projects flagged <b>not auto-converted</b> are outside what the .NET Upgrade Assistant handles. Budget for these separately &mdash; they are the most commonly underestimated part of a Xamarin migration.</p></div>
+<div class="card"><h2>NuGet dependencies</h2><table><tr><th style="width:26%">Package</th><th style="width:11%">Version</th><th style="width:15%">Status</th><th style="width:48%">MAUI path</th></tr>
+<tr><td class="mono">Acr.UserDialogs</td><td class="mono loc"></td><td><span class="sev" style="background:#c0392b">Blocked</span></td><td class="fix">CommunityToolkit.Maui popups + alerts<br><span class="loc">Acr.UserDialogs is archived with no official MAUI release. Budget a rewrite of every dialog call site.</span></td></tr>
+<tr><td class="mono">Xamarin.Android.Support.Design</td><td class="mono loc">28.0.0.3</td><td><span class="sev" style="background:#c0392b">Blocked</span></td><td class="fix">AndroidX<br><span class="loc">The Android Support Libraries are end of life. MAUI requires AndroidX equivalents.</span></td></tr>
+<tr><td class="mono">Xamarin.Android.Support.v4</td><td class="mono loc">28.0.0.3</td><td><span class="sev" style="background:#c0392b">Blocked</span></td><td class="fix">AndroidX<br><span class="loc">The Android Support Libraries are end of life. MAUI requires AndroidX equivalents.</span></td></tr>
+<tr><td class="mono">Xamarin.FFImageLoading.Forms</td><td class="mono loc"></td><td><span class="sev" style="background:#c0392b">Blocked</span> <span class="badge verify">verify</span></td><td class="fix">FFImageLoading.Maui (community fork)<br><span class="loc">The original is archived. A community MAUI fork exists; check its maintenance status before depending on it. MAUI Image plus a caching handler covers many cases.</span></td></tr>
+<tr><td class="mono">Xamarin.Forms.Platform.UAP</td><td class="mono loc"></td><td><span class="sev" style="background:#c0392b">Blocked</span></td><td class="fix">WinUI 3 (net-windows target)<br><span class="loc">UWP is not a .NET MAUI target platform. This is a rewrite, not a migration.</span></td></tr>
+<tr><td class="mono">Lottie.Forms</td><td class="mono loc">4.0.5</td><td><span class="sev" style="background:#d35400">Replaced</span></td><td class="fix">SkiaSharp.Extended.UI.Maui (SKLottieView)</td></tr>
+<tr><td class="mono">Plugin.Media</td><td class="mono loc"></td><td><span class="sev" style="background:#d35400">Replaced</span></td><td class="fix">MediaPicker (Essentials)</td></tr>
+<tr><td class="mono">Plugin.Permissions</td><td class="mono loc"></td><td><span class="sev" style="background:#d35400">Replaced</span></td><td class="fix">Permissions (Essentials)</td></tr>
+<tr><td class="mono">Prism.Forms</td><td class="mono loc"></td><td><span class="sev" style="background:#d35400">Replaced</span></td><td class="fix">Prism.Maui<br><span class="loc">Prism 9 targets MAUI. Navigation registration changes.</span></td></tr>
+<tr><td class="mono">Rg.Plugins.Popup</td><td class="mono loc"></td><td><span class="sev" style="background:#d35400">Replaced</span></td><td class="fix">Mopups<br><span class="loc">Community successor by the same lineage. API is close but namespaces change.</span></td></tr>
+<tr><td class="mono">ZXing.Net.Mobile</td><td class="mono loc">2.4.1</td><td><span class="sev" style="background:#d35400">Replaced</span></td><td class="fix">ZXing.Net.Maui<br><span class="loc">Rewritten for MAUI; the API is not source-compatible.</span></td></tr>
+<tr><td class="mono">Syncfusion.Xamarin.SfChart</td><td class="mono loc"></td><td><span class="sev" style="background:#b7950b">Renamed</span></td><td class="fix">Syncfusion.Maui.Charts<br><span class="loc">Syncfusion ships a MAUI equivalent for this control. See the mapping table in this report.</span></td></tr>
+<tr><td class="mono">Syncfusion.Xamarin.SfDataGrid</td><td class="mono loc"></td><td><span class="sev" style="background:#b7950b">Renamed</span></td><td class="fix">Syncfusion.Maui.DataGrid<br><span class="loc">Syncfusion ships a MAUI equivalent for this control. See the mapping table in this report.</span></td></tr>
+<tr><td class="mono">Syncfusion.Xamarin.SfSchedule</td><td class="mono loc"></td><td><span class="sev" style="background:#b7950b">Renamed</span></td><td class="fix">Syncfusion.Maui.Scheduler<br><span class="loc">Syncfusion ships a MAUI equivalent for this control. See the mapping table in this report.</span></td></tr>
+<tr><td class="mono">Xamarin.CommunityToolkit</td><td class="mono loc"></td><td><span class="sev" style="background:#b7950b">Renamed</span></td><td class="fix">CommunityToolkit.Maui<br><span class="loc">Not a drop-in: several behaviours and converters were dropped or renamed.</span></td></tr>
+<tr><td class="mono">Xamarin.Essentials</td><td class="mono loc"></td><td><span class="sev" style="background:#5d6d7e">Builtin</span></td><td class="fix">Microsoft.Maui.Essentials (built in)<br><span class="loc">Namespaces change to Microsoft.Maui.*. Most APIs keep their names.</span></td></tr>
+<tr><td class="mono">Xamarin.Forms</td><td class="mono loc"></td><td><span class="sev" style="background:#5d6d7e">Builtin</span></td><td class="fix">.NET MAUI framework<br><span class="loc">Remove the package reference; MAUI is an SDK workload.</span></td></tr>
+<tr><td class="mono">Microsoft.NET.Native.Compiler</td><td class="mono loc"></td><td><span class="sev" style="background:#7f8c8d">Unknown</span></td><td class="fix"><span class="muted">&mdash;</span></td></tr>
+<tr><td class="mono">SomeInternal.Corp.Library</td><td class="mono loc"></td><td><span class="sev" style="background:#7f8c8d">Unknown</span></td><td class="fix"><span class="muted">&mdash;</span></td></tr>
+<tr><td class="mono">Newtonsoft.Json</td><td class="mono loc"></td><td><span class="sev" style="background:#7f8c8d">Ok</span></td><td class="fix"><span class="muted">&mdash;</span></td></tr>
+<tr><td class="mono">sqlite-net-pcl</td><td class="mono loc"></td><td><span class="sev" style="background:#7f8c8d">Ok</span></td><td class="fix"><span class="muted">&mdash;</span></td></tr>
+</table>
+<p class="muted" style="margin-top:12px;font-size:12.5px"><b>Unknown</b> means the package is not in this tool&rsquo;s rule set &mdash; it is not a judgement about the package. <b>Verify</b> marks entries a maintainer should confirm against current sources rather than trust outright.</p></div>
+<div class="card"><h2>Syncfusion control mapping</h2><table><tr><th>Xamarin package</th><th>Version</th><th>.NET MAUI package</th></tr>
+<tr><td class="mono">Syncfusion.Xamarin.SfChart</td><td class="mono loc"></td><td class="mono">Syncfusion.Maui.Charts</td></tr>
+<tr><td class="mono">Syncfusion.Xamarin.SfDataGrid</td><td class="mono loc"></td><td class="mono">Syncfusion.Maui.DataGrid</td></tr>
+<tr><td class="mono">Syncfusion.Xamarin.SfSchedule</td><td class="mono loc"></td><td class="mono">Syncfusion.Maui.Scheduler</td></tr>
+</table><p class="muted" style="margin-top:12px;font-size:12.5px">Per-control migration guides: <a href="https://help.syncfusion.com/maui/common/migration">help.syncfusion.com/maui/common/migration</a></p></div>
+<div class="card"><h2>How the estimate was calculated</h2>
+<p class="muted" style="font-size:12.5px;margin-top:0">Every number below is shown so you can substitute your own rates. The range applied to the total is &minus;40% to +40%, which reflects how wide real migration outcomes are.</p>
+<table><tr><th>Work</th><th style="width:70px">Count</th><th style="width:90px">Hours each</th><th style="width:80px">Hours</th></tr>
+<tr><td>Project and build setup</td><td class="mono">1</td><td class="mono loc">16</td><td class="mono">16</td></tr>
+<tr><td>Platform heads to convert</td><td class="mono">2</td><td class="mono loc">4</td><td class="mono">8</td></tr>
+<tr><td>UWP project rewrite (WinUI 3)</td><td class="mono">1</td><td class="mono loc">40</td><td class="mono">40</td></tr>
+<tr><td>iOS app extensions to recreate</td><td class="mono">1</td><td class="mono loc">12</td><td class="mono">12</td></tr>
+<tr><td>Binding projects to recreate</td><td class="mono">1</td><td class="mono loc">8</td><td class="mono">8</td></tr>
+<tr><td>Custom renderers to port</td><td class="mono">3</td><td class="mono loc">4</td><td class="mono">12</td></tr>
+<tr><td>Platform effects to review</td><td class="mono">1</td><td class="mono loc">2</td><td class="mono">2</td></tr>
+<tr><td>DependencyService call sites</td><td class="mono">3</td><td class="mono loc">0.5</td><td class="mono">1.5</td></tr>
+<tr><td>Removed or obsoleted APIs</td><td class="mono">6</td><td class="mono loc">0.5</td><td class="mono">3</td></tr>
+<tr><td>Namespace updates</td><td class="mono">7</td><td class="mono loc">0.1</td><td class="mono">0.7</td></tr>
+<tr><td>XAML: high-severity changes</td><td class="mono">1</td><td class="mono loc">2</td><td class="mono">2</td></tr>
+<tr><td>XAML: medium-severity changes</td><td class="mono">2</td><td class="mono loc">1</td><td class="mono">2</td></tr>
+<tr><td>XAML: low-severity changes</td><td class="mono">4</td><td class="mono loc">0.25</td><td class="mono">1</td></tr>
+<tr><td>Packages with no MAUI path</td><td class="mono">5</td><td class="mono loc">8</td><td class="mono">40</td></tr>
+<tr><td>Packages to swap</td><td class="mono">6</td><td class="mono loc">2</td><td class="mono">12</td></tr>
+<tr><td>Packages to rename</td><td class="mono">4</td><td class="mono loc">1</td><td class="mono">4</td></tr>
+<tr><td>Packages to remove</td><td class="mono">2</td><td class="mono loc">0.5</td><td class="mono">1</td></tr>
+<tr><td><b>Total</b></td><td></td><td></td><td class="mono"><b>165.2</b></td></tr>
+</table><p style="margin-top:12px"><b>165.2 hours</b> &rarr; 20.6 developer-days &rarr; reported range <b>12&ndash;29 days</b> at &plusmn;40%.</p>
+<h3>What this excludes</h3><p class="fix">New features, UI redesign, QA and regression cycles, store resubmission and review, team ramp-up on MAUI, and any backend work. It also assumes the app currently builds.</p>
+<h3>And how the readiness score was calculated</h3>
+<p class="fix">The score measures blocker <i>density</i>, so a large application is not penalised simply for being large:</p>
+<p class="mono" style="background:#f8fafb;border:1px solid #e6ebef;border-radius:6px;padding:11px 13px;font-size:12px">
+penalty = (10 &times; 8) + (4 &times; 15) + (1 &times; 14) + (0.2 &times; 12) = <b>156.4</b><br>
+scale &nbsp;&nbsp;= 40 + (8 &times; 6 projects) + (0.4 &times; 10 source files) = <b>92</b><br>
+score &nbsp;&nbsp;= 100 &times; e<sup>&minus;penalty/scale</sup> = <b>18</b>
+</p>
+<p class="fix">Those constants are judgement rather than measurement. They are printed here so you can disagree with them and recompute.</p></div>
+<div class="card"><h2>Suggested sequence</h2>
+<ol style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.9">
+<li><b>Deal with the projects the Upgrade Assistant will not touch first.</b> UWP heads, iOS extensions and binding projects drive the timeline, and finding them late is what turns an eight-week migration into a five-month one.</li>
+<li><b>Resolve blocked packages before writing any code.</b> A dependency with no MAUI path is an architectural decision, not a porting task.</li>
+<li><b>Run the .NET Upgrade Assistant on the shared project and the mobile heads.</b> Expect it to handle project files and namespaces, and nothing platform-specific. Note that the official documentation is stale &mdash; it was last updated in January 2024 and still retargets to net8.0, which left support in May 2025. Retarget to a current TFM yourself.</li>
+<li><b>Port renderers to handlers.</b> Take the highest-traffic screens first so you get a shippable build early.</li>
+<li><b>Replace removed APIs.</b> Application.Properties deserves care: without a one-time upgrade path, existing users lose their stored data on update.</li>
+<li><b>Clear the compatibility namespace.</b> Microsoft.Maui.Controls.Compatibility does not ship in .NET 11. Anything left behind here blocks that upgrade.</li>
+<li><b>Ship to both stores before the deadlines.</b> Store review is not instant; work back from 31 August, or 1 November if you take the Play extension.</li>
+</ol></div>
+<div class="foot">
+<b>Method and limits.</b> This is static text analysis, not compilation. It finds patterns in project files, C# and XAML; it cannot see runtime behaviour, reflection, source generators, or anything behind conditional compilation. Treat the output as a scoped starting point for planning, not a guarantee of completeness. Findings are evidence-linked so every one can be checked by opening the file at the stated line.<br>
+<b>Privacy.</b> Nothing is uploaded and nothing leaves this machine. The tool makes no network calls. The HTML report contains file paths and short code excerpts from your solution &mdash; review it before sharing outside your team.<br>
+<b>Rule set.</b> 2026-08-11. Package guidance changes as community ports appear and are abandoned; entries marked <span class="badge verify">verify</span> should be confirmed against current sources.<br>
+<b>Licence.</b> MIT. Corrections and additional package rules are welcome at <a href="https://github.com/syncfusion/xamarin-migration-advisor">github.com/syncfusion/xamarin-migration-advisor</a>.<br>
+<b>About.</b> Built by Syncfusion, which actively contributes to the <a href="https://github.com/dotnet/maui">.NET MAUI open-source project</a> &mdash; including migrating .NET MAUI&rsquo;s own UI test suite from Xamarin.UITest to Appium. <a href="https://devblogs.microsoft.com/dotnet/dotnet-maui-welcomes-syncfusion-open-source-contributions/">Microsoft .NET Blog</a>.
+</div>
+</div></body></html>
+
