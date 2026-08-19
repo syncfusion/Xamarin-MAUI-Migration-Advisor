@@ -165,4 +165,4 @@ This tool is useful whether or not you use Syncfusion controls. It reports on yo
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT Licensed. See [LICENSE](LICENSE).
