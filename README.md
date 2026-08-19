@@ -1,4 +1,4 @@
-# Xamarin Migration Advisor
+# Xamarin MAUI Migration Advisor
 
 A single PowerShell script that scans a Xamarin.Forms solution and tells you what stands between it and .NET MAUI, then writes a self-contained HTML report you can hand to whoever approves the budget.
 
@@ -138,12 +138,6 @@ The most valuable contribution is a package rule. Everything the tool knows live
 | `Ok` | Works unchanged |
 
 Add API and XAML rules the same way, in `$script:ApiRules` and `$script:XamlRules`.
-
-There is a sample solution under  `samples/` that deliberately contains most of what the tool looks for, so you can use it to check a new rule fires:
-
-```powershell
-.\Invoke-XamarinMigrationReadiness.ps1 -Path .\samples\ContosoExpenses
-```
 
 Corrections to the guidance itself are just as welcome as new rules. If we have recommended a package that is no longer maintained, we would rather hear it here than have a team discover it mid-migration.
 
