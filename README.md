@@ -10,7 +10,7 @@ There is no install, no account, and no upload. The script reads local files onl
 3. Run the script.
 
 ```powershell
-.\Invoke-XamarinMigrationReadiness.ps1 -Path C:\src\MyApp
+.\XamarinMAUIMigration.ps1 -Path C:\src\MyApp
 ```
 
 If you omit `-Path`, the Samples folder is scanned.
@@ -55,22 +55,22 @@ Use the following procedure to run the scan and review the output.
 
 ```powershell
 # Scan the Samples folder
-.\Invoke-XamarinMigrationReadiness.ps1
+.\XamarinMAUIMigration.ps1
 
 # Scan another folder and write to a specific output file
-.\Invoke-XamarinMigrationReadiness.ps1 -Path C:\src\MyApp -OutputPath C:\temp\report.html
+.\XamarinMAUIMigration.ps1 -Path C:\src\MyApp -OutputPath C:\temp\report.html
 
 # Console summary only
-.\Invoke-XamarinMigrationReadiness.ps1 -SkipReport
+.\XamarinMAUIMigration.ps1 -SkipReport
 
 # Include test projects, which are excluded by default
-.\Invoke-XamarinMigrationReadiness.ps1 -IncludeTestProjects
+.\XamarinMAUIMigration.ps1 -IncludeTestProjects
 ```
 
 | Parameter | Default | Description |
 |---|---|---|
 | `-Path` | `.` | Root folder to scan |
-| `-OutputPath` | `.\xamarin-migration-readiness.html` | Path where the HTML report is written |
+| `-OutputPath` | `.\xamarin-maui-migration-readiness.html` | Path where the HTML report is written |
 | `-SkipReport` | off | Console summary only |
 | `-IncludeTestProjects` | off | Include projects that look like test projects |
 | `-MaxFileSizeKB` | `2048` | Skip source files larger than this |
