@@ -30,7 +30,7 @@
     Root folder of the solution to scan. Defaults to the current directory.
 
 .PARAMETER OutputPath
-    Where to write the HTML report. Defaults to .\xamarin-migration-readiness.html
+    Where to write the HTML report. Defaults to .\xamarin-maui-migration-readiness.html
 
 .PARAMETER SkipReport
     Print the console summary only; do not write the HTML file.
@@ -42,10 +42,10 @@
     Skip source files larger than this. Defaults to 2048 (2 MB). Guards against generated files.
 
 .EXAMPLE
-    .\Invoke-XamarinMigrationReadiness.ps1
+    .\XamarinMAUIMigration.ps1
 
 .EXAMPLE
-    .\Invoke-XamarinMigrationReadiness.ps1 -Path C:\src\MyApp -OutputPath C:\temp\report.html
+    .\XamarinMAUIMigration.ps1 -Path C:\src\MyApp -OutputPath C:\temp\report.html
 
 .NOTES
     Licence : MIT
@@ -681,7 +681,7 @@ if ($SkipReport) { return }
 # ==============================================================================================
 #  HTML REPORT
 # ==============================================================================================
-if (-not $OutputPath) { $OutputPath = Join-Path (Get-Location) 'xamarin-migration-readiness.html' }
+if (-not $OutputPath) { $OutputPath = Join-Path (Get-Location) 'xamarin-maui-migration-readiness.html' }
 
 $sevColour = @{ 'Critical'='#c0392b'; 'High'='#d35400'; 'Medium'='#b7950b'; 'Low'='#5d6d7e'; 'Info'='#7f8c8d' }
 $generated = (Get-Date).ToString('d MMMM yyyy, HH:mm')
@@ -767,7 +767,7 @@ if ($nothingFound) {
 means the wrong folder was scanned, rather than a codebase with nothing to fix &mdash; so this report
 deliberately shows no score and no estimate.</p>
 <p class="fix">Point the tool at the folder containing your <code>.sln</code> file and run it again:<br>
-<code>.\Invoke-XamarinMigrationReadiness.ps1 -Path C:\src\MyApp</code></p></div>
+<code>.\XamarinMAUIMigration.ps1 -Path C:\src\MyApp</code></p></div>
 </div></body></html>
 "@
     $sb.ToString() | Set-Content -LiteralPath $OutputPath -Encoding UTF8
