@@ -1,14 +1,19 @@
-# Xamarin MAUI Migration Advisor
+# Xamarin MAUI Migration Advisor.
+Xamarin MAUI Migration Advisor is a single PowerShell script that scans a Xamarin solution and highlights what may block a move to .NET MAUI. It then generates a self-contained HTML report that can be shared with engineering, product, and budget approvers.
 
-A single PowerShell script that scans a Xamarin.Forms solution and tells you what stands between it and .NET MAUI, then writes a self-contained HTML report you can hand to whoever approves the budget.
+There is no install, no account, and no upload. The script reads local files only and writes one HTML report.
 
-No install, no account, no upload. It reads your files and writes one HTML file.
+## Quick start
+
+1. Open a PowerShell window.
+2. Go to the folder that contains your solution, or choose the folder you want to scan.
+3. Run the script.
 
 ```powershell
 .\Invoke-XamarinMigrationReadiness.ps1 -Path C:\src\MyApp
 ```
 
----
+If you omit `-Path`, the Samples folder is scanned.
 
 ## Why now
 
@@ -19,57 +24,60 @@ Two platform deadlines have closed on Xamarin apps, and neither is a support-pol
 
 A Xamarin app today is not merely unsupported. It cannot ship updates.
 
-Most teams know they have to move. What they don't know is what it will cost, and the parts that hurt most. UWP heads, iOS app extensions, binding projects, an archived dependencies with no migration path are exactly the parts the .NET Upgrade Assistant leaves untouched. This tool finds them before you commit to a date.
-
----
+Most teams know they have to move. What they do not always know is what it will cost, and which parts will be hardest to migrate. UWP heads, iOS app extensions, binding projects, and archived dependencies with no migration path are exactly the kinds of projects the .NET Upgrade Assistant leaves untouched. This tool identifies them before you commit to a migration date.
 
 ## What it finds
 
+The report focuses on the items below and shows the file and line that produced each result.
+
 | | |
 |---|---|
-| **Custom renderers** | Every `[assembly: ExportRenderer]` and renderer class, with the file and line, and what the handler equivalent is |
+| **Custom renderers** | Every `[assembly: ExportRenderer]` and renderer class, with the file and line, plus the handler equivalent where available |
 | **Platform effects** | `PlatformEffect` implementations and `ExportEffect` registrations |
-| **Projects the Upgrade Assistant will not convert** | UWP, iOS app extensions, iOS and Android binding projects, Xamarin.Mac, tvOS, watchOS |
-| **Dependencies with no MAUI path** | ~60 package rules covering absorbed, renamed, replaced, archived and blocked packages |
-| **Removed and obsoleted APIs** | `Device.*`, `Application.Properties`, `MessagingCenter`, `DependencyService` |
-| **.NET 11 blockers** | Anything depending on `Microsoft.Maui.Controls.Compatibility`, which stops shipping in .NET 11 |
-| **XAML issues** | `RelativeLayout`, `Frame`, `TableView`, retired `OnPlatform` targets, the Xamarin.Forms namespace |
-| **Syncfusion control mapping** | Xamarin package → MAUI package, where Syncfusion packages are present |
-| **An effort estimate** | In developer-days, with every input and rate shown so you can substitute your own |
+| **Projects the Upgrade Assistant will not convert** | UWP, iOS app extensions, iOS and Android binding projects, Xamarin.Mac, tvOS, and watchOS |
+| **Dependencies with no MAUI path** | About 60 package rules covering absorbed, renamed, replaced, archived, and blocked packages |
+| **Removed and obsoleted APIs** | `Device.*`, `Application.Properties`, `MessagingCenter`, and `DependencyService` |
+| **.NET 11 blockers** | Anything depending on `Microsoft.Maui.Controls.Compatibility`, which is not supported in .NET 11 |
+| **XAML issues** | `RelativeLayout`, `Frame`, `TableView`, retired `OnPlatform` targets, and the Xamarin.Forms namespace |
+| **Syncfusion control mapping** | Xamarin package to MAUI package mapping where Syncfusion packages are present |
+| **Effort estimate** | Estimated in developer-days, with every input and rate shown so you can substitute your own |
 
-Each finding carries the file and line that produced it, so you can open it and check.
-
----
+Each finding includes the file and line that produced it, so you can open it and verify the result.
 
 ## Usage
 
+Use the following procedure to run the scan and review the output.
+
+1. Choose the root folder to scan.
+2. Run the script.
+3. Review the console summary or the generated HTML report.
+4. Share the report with the stakeholders who need migration visibility.
+
 ```powershell
-# Scan the current folder, write ./xamarin-migration-readiness.html
+# Scan the Samples folder
 .\Invoke-XamarinMigrationReadiness.ps1
 
-# Scan somewhere else, write somewhere else
+# Scan another folder and write to a specific output file
 .\Invoke-XamarinMigrationReadiness.ps1 -Path C:\src\MyApp -OutputPath C:\temp\report.html
 
 # Console summary only
 .\Invoke-XamarinMigrationReadiness.ps1 -SkipReport
 
-# Include test projects (excluded by default)
+# Include test projects, which are excluded by default
 .\Invoke-XamarinMigrationReadiness.ps1 -IncludeTestProjects
 ```
 
-| Parameter | Default | |
+| Parameter | Default | Description |
 |---|---|---|
 | `-Path` | `.` | Root folder to scan |
-| `-OutputPath` | `.\xamarin-migration-readiness.html` | Where to write the report |
+| `-OutputPath` | `.\xamarin-migration-readiness.html` | Path where the HTML report is written |
 | `-SkipReport` | off | Console summary only |
 | `-IncludeTestProjects` | off | Include projects that look like test projects |
 | `-MaxFileSizeKB` | `2048` | Skip source files larger than this |
 
-**Requires** Windows PowerShell 5.1 or PowerShell 7+. Runs on Windows, macOS and Linux. No modules, no dependencies.
+**Requires** Windows PowerShell 5.1 or PowerShell 7+. Runs on Windows, macOS, and Linux. No modules or dependencies are required.
 
-`bin`, `obj`, `packages`, `node_modules`, `.git`, `.vs`, `TestResults` and generated `*.g.cs` / `*.designer.cs` files are skipped.
-
----
+The following folders and generated files are skipped: `bin`, `obj`, `packages`, `node_modules`, `.git`, `.vs`, `TestResults`, `*.g.cs`, and `*.designer.cs`.
 
 ## The readiness score
 
@@ -88,17 +96,13 @@ score   = 100 × e^(−penalty/scale)
 | 25–44 | Substantial |
 | 1–24 | Major |
 
-Those constants are judgement, not measurement. The report prints the full calculation with your numbers substituted in, so you can disagree with it and recompute. The same is true of the effort model: every rate is listed in the report, line by line.
-
----
+Those constants are judgment, not measurement. The report prints the full calculation with your numbers substituted in, so you can disagree with it and recompute. The same is true of the effort model: every rate is listed in the report, line by line.
 
 ## Privacy
 
-The tool makes **no network calls**. Nothing is uploaded, nothing is sent anywhere, and no telemetry is collected. Read the script is a single file, and the only thing it writes is the HTML report.
+The tool makes **no network calls**. Nothing is uploaded, nothing is sent anywhere, and no telemetry is collected. The script is a single file, and the only thing it writes is the HTML report.
 
 The report does contain **file paths and short code excerpts from your solution**. Review it before sharing it outside your team.
-
----
 
 ## Limitations: read these before trusting the output
 
@@ -114,14 +118,24 @@ The effort estimate is a **planning input, not a quote**. It assumes the app cur
 
 Package guidance goes stale as community ports appear and are abandoned. Entries marked **verify** in the report are ones we would like a second pair of eyes on. If you find one that is wrong, please open an issue. That is the fastest way to make this better for the next team.
 
----
+## How to contribute
 
-## Contributing
+This is an open-source project, and contributions from users and other contributors are welcome.
 
-The most valuable contribution is a package rule. Everything the tool knows lives in one clearly marked section at the top of the script.
+The most useful contributions are:
+
+- package rule updates
+- API rule updates
+- XAML rule updates
+- corrections to the migration guidance itself
+
+Everything the tool knows lives in one clearly marked section at the top of the script.
+
+When adding or updating a rule, keep the category, target, note, and confidence consistent with the existing format.
 
 ```powershell
-@{ Id='Some.Xamarin.Package'
+@{
+Id='Some.Xamarin.Package'
    Status='Replaced'                    # Builtin | Renamed | Replaced | Blocked | Check | Ok
    Target='Some.Maui.Package'
    Note='What changes, and what to watch for.'
@@ -139,9 +153,7 @@ The most valuable contribution is a package rule. Everything the tool knows live
 
 Add API and XAML rules the same way, in `$script:ApiRules` and `$script:XamlRules`.
 
-Corrections to the guidance itself are just as welcome as new rules. If we have recommended a package that is no longer maintained, we would rather hear it here than have a team discover it mid-migration.
-
----
+If you find a rule or recommendation that is outdated, please open an issue or submit a correction.
 
 ## About
 
@@ -161,8 +173,6 @@ That work includes migrating .NET MAUI's own UI test suite from Xamarin.UITest t
 
 This tool is useful whether or not you use Syncfusion controls. It reports on your whole solution, not on ours.
 
----
+## License
 
-## Licence
-
-MIT Licensed. See [LICENSE](LICENSE).
+MIT licensed. See [LICENSE](LICENSE).
