@@ -1200,8 +1200,17 @@ Add-Html @"
 <title>Xamarin Migration Readiness - $(ConvertTo-HtmlText $solName)</title>
 <style>
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{margin:0;background:#f4f6f8;color:#1c2530;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.toc a{display:block;background:#f8fafb;border:1px solid #e6ebef;border-radius:8px;padding:9px 12px;color:#1c2530;text-decoration:none;font-size:13px;font-weight:600}
+.toc a:hover{border-color:#9aa7b3;background:#fff}
+.totop{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;background:#1c2530;color:#fff;
+  display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:18px;z-index:99;
+  opacity:0;pointer-events:none;transition:opacity .2s;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.totop:hover{background:#33475e}
+.totop.show{opacity:1;pointer-events:auto}
 h1{font-size:24px;margin:0 0 4px;letter-spacing:-.3px}
 .sub{color:#61707f;font-size:13px;margin-bottom:24px}
 .card{background:#fff;border:1px solid #dfe5ea;border-radius:10px;padding:20px;margin-bottom:18px}
@@ -1242,7 +1251,7 @@ summary::marker{color:#9aa7b3}
 .verify{background:#fff4d6;color:#8a6d00}
 .obsolete{background:#fde0da;color:#a04000}
 .unverified{background:#e6ebef;color:#61707f}
-@media print{body{background:#fff}.card{break-inside:avoid;border-color:#ccc}}
+@media print{body{background:#fff}.card{break-inside:avoid;border-color:#ccc}.totop{display:none}}
 </style></head><body><div class="wrap">
 <h1>Xamarin to .NET MAUI &mdash; Migration Readiness</h1>
 <div class="sub">$(ConvertTo-HtmlText $solName) &middot; generated $generated &middot; analyser v$script:ToolVersion, rule set $script:RuleSetDate</div>
@@ -1322,9 +1331,25 @@ Add-Html @"
 "@
 }
 
+# ---- Table of contents ----
+if (-not $notXamarin) {
+    Add-Html '<div class="card" id="toc"><h2>Report contents</h2><div class="toc">'
+    foreach ($t in @('Findings','Projects','NuGet dependencies','Syncfusion control mapping','How the estimate was calculated','Suggested sequence')) {
+        if ($t -eq 'Syncfusion control mapping' -and $syncfusionFound.Count -eq 0) { continue }
+        $id = $t -replace ' ', '-'
+        $extra = if ($t -eq 'Findings' -and $findings.Count -gt 0) { " ($($findings.Count))" }
+                 elseif ($t -eq 'Projects') { " ($($projects.Count))" }
+                 elseif ($t -eq 'NuGet dependencies') { " ($($packageResults.Count))" }
+                 elseif ($t -eq 'Syncfusion control mapping') { " ($($syncfusionFound.Count))" } else { '' }
+        Add-Html "<a href=`"#sec-$id`">$t$extra</a>"
+    }
+    Add-Html '</div>'
+    Add-Html '<p class="muted" style="font-size:12px;margin:10px 0 0">Large reports are easier to navigate from here. Sections are collapsible; the &uarr; button at the bottom-right of every page returns to this list.</p></div>'
+}
+
 # Detail sections below only apply to actual Xamarin projects.
 if (-not $notXamarin) {
-    Add-Html '<div class="card"><h2>Findings</h2>'
+    Add-Html '<div class="card" id="sec-Findings"><h2>Findings</h2>'
 if ($findings.Count -eq 0) {
     Add-Html '<p class="muted">No migration blockers detected. Verify that the scan covered the intended folder, and re-run with -IncludeTestProjects if test projects matter to you.</p>'
 } else {
@@ -1344,7 +1369,7 @@ if ($findings.Count -eq 0) {
 Add-Html '</div>'
 
 # ---- Projects ----
-Add-Html '<div class="card"><h2>Projects</h2><table><tr><th style="width:27%">Project</th><th style="width:24%">Type</th><th style="width:15%">Target</th><th style="width:34%">Path</th></tr>'
+Add-Html '<div class="card" id="sec-Projects"><h2>Projects</h2><table><tr><th style="width:27%">Project</th><th style="width:24%">Type</th><th style="width:15%">Target</th><th style="width:34%">Path</th></tr>'
 foreach ($p in ($projects | Sort-Object @{E={$_.Blocking};D=$true}, Name)) {
     $flag = if ($p.Blocking -gt 0) { ' <span class="sev" style="background:#c0392b">not auto-converted</span>' } else { '' }
     Add-Html "<tr><td><b>$(ConvertTo-HtmlText $p.Name)</b>$flag</td><td>$(ConvertTo-HtmlText $p.Kinds)</td><td class=`"mono`">$(ConvertTo-HtmlText $p.Tfm)</td><td class=`"mono loc`">$(ConvertTo-HtmlText $p.Path)</td></tr>"
@@ -1352,7 +1377,7 @@ foreach ($p in ($projects | Sort-Object @{E={$_.Blocking};D=$true}, Name)) {
 Add-Html '</table><p class="muted" style="margin-top:12px;font-size:12.5px">Projects flagged <b>not auto-converted</b> are outside what the .NET Upgrade Assistant handles. Budget for these separately &mdash; they are the most commonly underestimated part of a Xamarin migration.</p></div>'
 
 # ---- Packages ----
-Add-Html '<div class="card"><h2>NuGet dependencies</h2><table><tr><th style="width:26%">Package</th><th style="width:11%">Version</th><th style="width:15%">Status</th><th style="width:48%">MAUI path</th></tr>'
+Add-Html '<div class="card" id="sec-NuGet-dependencies"><h2>NuGet dependencies</h2><table><tr><th style="width:26%">Package</th><th style="width:11%">Version</th><th style="width:15%">Status</th><th style="width:48%">MAUI path</th></tr>'
 $statusOrder = @{ 'Blocked'=0;'Replaced'=1;'Check'=2;'Renamed'=3;'Builtin'=4;'Unknown'=5;'Ok'=6 }
 foreach ($p in ($packageResults | Sort-Object @{E={$statusOrder[$_.Status]}}, Id)) {
     $col = $sevColour[$p.Severity]
@@ -1366,7 +1391,7 @@ Add-Html '<p class="muted" style="margin-top:12px;font-size:12.5px"><b>Unknown</
 
 # ---- Syncfusion mapping ----
 if ($syncfusionFound.Count -gt 0) {
-    Add-Html '<div class="card"><h2>Syncfusion control mapping</h2>'
+    Add-Html '<div class="card" id="sec-Syncfusion-control-mapping"><h2>Syncfusion control mapping</h2>'
     Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Each row is classified so a reader can tell what to do next: <b>Exact replacement</b> names the verified MAUI package; <b>Obsolete</b> means no MAUI package exists (use the MAUI built-in or rewrite); <b>Unverified</b> means the control is not in the verified mapping table and must be investigated - do not infer <code>Syncfusion.Maui.&lt;X&gt;</code>.</p>'
     Add-Html '<table><tr><th>Xamarin package</th><th>Version</th><th>Classification</th><th>.NET MAUI package / action</th></tr>'
     $kindClass = @{ 'Exact replacement'='verify'; 'Obsolete'='obsolete'; 'Unverified'='unverified' }
@@ -1379,7 +1404,7 @@ if ($syncfusionFound.Count -gt 0) {
 }
 
 # ---- Effort method ----
-Add-Html '<div class="card"><h2>How the estimate was calculated</h2>'
+Add-Html '<div class="card" id="sec-How-the-estimate-was-calculated"><h2>How the estimate was calculated</h2>'
 Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Every number below is shown so you can substitute your own rates. The range applied to the total is &minus;40% to +40%, which reflects how wide real migration outcomes are.</p>'
 Add-Html '<table><tr><th>Work</th><th style="width:70px">Count</th><th style="width:90px">Hours each</th><th style="width:80px">Hours</th></tr>'
 foreach ($e in $effortLines) {
@@ -1401,7 +1426,7 @@ score &nbsp;&nbsp;= 100 &times; e<sup>&minus;penalty/scale</sup> = <b>$score</b>
 
 # ---- Next steps ----
 Add-Html @"
-<div class="card"><h2>Suggested sequence</h2>
+<div class="card" id="sec-Suggested-sequence"><h2>Suggested sequence</h2>
 <ol style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.9">
 <li><b>Deal with the projects the Upgrade Assistant will not touch first.</b> UWP heads, iOS extensions and binding projects drive the timeline, and finding them late is what turns an eight-week migration into a five-month one.</li>
 <li><b>Resolve blocked packages before writing any code.</b> A dependency with no MAUI path is an architectural decision, not a porting task.</li>
@@ -1430,7 +1455,20 @@ Add-Html @"
 <b>Licence.</b> MIT. Corrections and additional package rules are welcome at <a href="https://github.com/syncfusion/Xamarin-MAUI-Migration-Advisor">github.com/syncfusion/xamarin-migration-advisor</a>.<br>
 <b>About.</b> Built by Syncfusion, which actively contributes to the <a href="https://github.com/dotnet/maui">.NET MAUI open-source project</a> &mdash; including migrating .NET MAUI&rsquo;s own UI test suite from Xamarin.UITest to Appium. <a href="https://devblogs.microsoft.com/dotnet/dotnet-maui-welcomes-syncfusion-open-source-contributions/">Microsoft .NET Blog</a>.
 </div>
-</div></body></html>
+</div>
+<a href="#toc" class="totop" id="totop" title="Back to contents">&uarr;</a>
+<script>
+(function(){
+  var btn = document.getElementById('totop');
+  if(!btn) return;
+  btn.href = '#toc';
+  if (!document.getElementById('toc')) { btn.href = '#'; btn.onclick = function(){ window.scrollTo({top:0,behavior:'smooth'}); return false; }; }
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 400) { btn.classList.add('show'); } else { btn.classList.remove('show'); }
+  }, {passive:true});
+})();
+</script>
+</body></html>
 "@
 
 $sb.ToString() | Set-Content -LiteralPath $OutputPath -Encoding UTF8
