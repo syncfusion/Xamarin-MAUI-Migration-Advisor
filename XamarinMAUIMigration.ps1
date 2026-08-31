@@ -272,9 +272,9 @@ $script:SyncfusionMap = [ordered]@{
 # Obsolete / under-way markers (official migration table). These control packages have
 # no verified MAUI NuGet replacement. They must NOT be invented.
 $script:SyncfusionObsolete = @(
-    'Syncfusion.Xamarin.SfBorder',        # Obsolete — use MAUI Border
-    'Syncfusion.Xamarin.SfGradientView',   # Obsolete — use MAUI Gradients
-    'Syncfusion.Xamarin.SfDiagram'         # Obsolete — use Syncfusion Blazor Diagram (via MAUI hybrid); no MAUI UI package
+    'Syncfusion.Xamarin.SfBorder',        # Obsolete - use MAUI Border
+    'Syncfusion.Xamarin.SfGradientView',   # Obsolete - use MAUI Gradients
+    'Syncfusion.Xamarin.SfDiagram'         # Obsolete - use Syncfusion Blazor Diagram (via MAUI hybrid); no MAUI UI package
 )
 
 # Per-package obsolete guidance text, so the report is actionable rather than just "obsolete".
@@ -656,7 +656,7 @@ $projects   = New-Object System.Collections.ArrayList
 $packages   = @{}   # id -> @{ Version, VersionSource, VersionUnresolved, Projects[] }
 $scanErrors = New-Object System.Collections.ArrayList
 
-# Scan-coverage counters (brief §7). "Eligible" = discovered files that should be scanned,
+# Scan-coverage counters (brief section 7). "Eligible" = discovered files that should be scanned,
 # after exclusion paths and test-project filtering are applied.
 $script:Coverage = [pscustomobject]@{
     DiscoveredCs     = 0
@@ -890,12 +890,12 @@ foreach ($id in ($packages.Keys | Sort-Object)) {
                         [void]$syncfusionFound.Add([pscustomobject]@{ From=$id; To=$target; Version=$info.Version; Kind='Exact replacement' })
                     }
                     elseif ($script:SyncfusionObsolete -contains $id) {
-                        $target = 'Obsolete — no Syncfusion .NET MAUI package. Use the MAUI built-in equivalent (see note) or a manual rewrite.'
+                        $target = 'Obsolete - no Syncfusion .NET MAUI package. Use the MAUI built-in equivalent (see note) or a manual rewrite.'
                         $exactReplacement = $false
                         [void]$syncfusionFound.Add([pscustomobject]@{ From=$id; To=$target; Version=$info.Version; Kind='Obsolete' })
                     }
                     else {
-                        $target = 'No verified exact MAUI package — investigation required (do not infer Syncfusion.Maui.<X>)'
+                        $target = 'No verified exact MAUI package - investigation required (do not infer Syncfusion.Maui.<X>)'
                         [void]$syncfusionFound.Add([pscustomobject]@{ From=$id; To=$target; Version=$info.Version; Kind='Unverified' })
                     }
                 }
@@ -953,7 +953,7 @@ foreach ($id in ($packages.Keys | Sort-Object)) {
 #  SCORE AND EFFORT
 # ==============================================================================================
 
-# ---- Deduplicate findings before scoring (brief §6) -----------------------------------------
+# ---- Deduplicate findings before scoring (brief section 6) ----------------------------------
 # Stable key: Title|CanonicalFile|Line. Where the same API recurs on one line we already
 # aggregated occurrences above; here we drop any remaining near-identical rows so the same
 # evidence cannot inflate the score or effort estimate.
@@ -967,7 +967,7 @@ foreach ($f in $findings) {
 }
 $findings = $deduped
 
-# ---- Scan coverage & confidence (brief §7, §10) ----------------------------------------------
+# ---- Scan coverage & confidence (brief sections 7 and 10) -----------------------------------
 $eligibleCs   = $script:Coverage.DiscoveredCs - $script:Coverage.OversizedCs - $script:Coverage.UnreadableCs
 $eligibleXaml = $script:Coverage.DiscoveredXaml - $script:Coverage.OversizedXaml - $script:Coverage.UnreadableXaml
 $scannedTotal = $script:Coverage.ScannedCs + $script:Coverage.ScannedXaml
@@ -1062,7 +1062,7 @@ $highDays = [math]::Max(2, [math]::Round(($totalHours * 1.4) / 8, 0))
 # reader nothing and makes every messy codebase look identical. Instead the penalty is normalised
 # by codebase size and passed through an exponential decay, so the score always differentiates and
 # never quite reaches zero. A large app with many findings is not automatically worse off than a
-# small app with a few — what matters is blocker density.
+# small app with a few - what matters is blocker density.
 #
 #   penalty = 10*critical + 4*high + 1*medium + 0.2*low
 #   scale   = 40 + 8*projects + 0.4*sourceFiles
@@ -1072,12 +1072,12 @@ $highDays = [math]::Max(2, [math]::Round(($totalHours * 1.4) / 8, 0))
 # with them and recompute.
 $penalty   = ($counts.Critical * 10) + ($counts.High * 4) + ($counts.Medium * 1) + ($counts.Low * 0.2)
 # Use successfully *scanned* (not merely discovered) file counts, so skipped/oversized files
-# do not inflate the size scale and award a higher score (brief §10).
+# do not inflate the size scale and award a higher score (brief section 10).
 $scannedFilesForScale = $script:Coverage.ScannedCs + $script:Coverage.ScannedXaml
 $sizeScale = 40 + (8 * $projects.Count) + (0.4 * $scannedFilesForScale)
 if ($sizeScale -le 0) { $sizeScale = 40 }
 
-# ---- Is this actually a Xamarin project? (brief §8) -----------------------------------------
+# ---- Is this actually a Xamarin project? (brief section 8) ----------------------------------
 # Look for concrete Xamarin evidence before producing a readiness score. Without it, a
 # plain .NET project that happens to have no findings would otherwise read 100/100, which
 # is misleading: there is nothing to migrate *to*.
@@ -1108,7 +1108,7 @@ if (-not $isXamarinProject -and -not $nothingFound) {
     $notXamarin = $false
 }
 
-# Critical blockers must prevent a green / 'Straightforward' result (brief §10).
+# Critical blockers must prevent a green / 'Straightforward' result (brief section 10).
 if ($counts.Critical -gt 0 -and $score -ge 70) {
     $score = 69
 }
@@ -1146,7 +1146,7 @@ else {
         Write-Host "  Verdict              Not a Xamarin project" -ForegroundColor Magenta
         Write-Host "  No concrete Xamarin evidence was found (no Xamarin packages, no Xamarin/UWP project" -ForegroundColor DarkGray
         Write-Host "  types, no Xamarin.Forms namespace imports). A .NET project with no findings is not" -ForegroundColor DarkGray
-        Write-Host "  a 100/100 migration candidate — there is nothing to migrate. Checked for:" -ForegroundColor DarkGray
+        Write-Host "  a 100/100 migration candidate - there is nothing to migrate. Checked for:" -ForegroundColor DarkGray
         foreach ($e in $xamarinEvidence) { Write-Host "    - $e" -ForegroundColor DarkGray }
         if ($xamarinEvidence.Count -eq 0) { Write-Host "    - Xamarin.* / Plugin.* package references" -ForegroundColor DarkGray; Write-Host "    - Xamarin/UWP/iOS/Android/Mac project types" -ForegroundColor DarkGray; Write-Host "    - Xamarin.Forms namespace or API usage in source" -ForegroundColor DarkGray }
     } else {
@@ -1169,7 +1169,7 @@ else {
     Write-Host ""
 }
 if ($daysToPlay -gt 0) {
-    Write-Host ("  Google Play API 36 deadline: {0} day(s) away (31 Aug 2026). Extensions are not automatic — they must be explicitly requested and approved." -f $daysToPlay) -ForegroundColor Yellow
+    Write-Host ("  Google Play API 36 deadline: {0} day(s) away (31 Aug 2026). Extensions are not automatic - they must be explicitly requested and approved." -f $daysToPlay) -ForegroundColor Yellow
 } elseif ($daysToExt -gt 0) {
     Write-Host ("  Google Play standard deadline has passed. An approved extension would run to 1 Nov 2026 ({0} day(s) away). Extensions are not automatic." -f $daysToExt) -ForegroundColor Red
 } else {
@@ -1367,7 +1367,7 @@ Add-Html '<p class="muted" style="margin-top:12px;font-size:12.5px"><b>Unknown</
 # ---- Syncfusion mapping ----
 if ($syncfusionFound.Count -gt 0) {
     Add-Html '<div class="card"><h2>Syncfusion control mapping</h2>'
-    Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Each row is classified so a reader can tell what to do next: <b>Exact replacement</b> names the verified MAUI package; <b>Obsolete</b> means no MAUI package exists (use the MAUI built-in or rewrite); <b>Unverified</b> means the control is not in the verified mapping table and must be investigated — do not infer <code>Syncfusion.Maui.&lt;X&gt;</code>.</p>'
+    Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Each row is classified so a reader can tell what to do next: <b>Exact replacement</b> names the verified MAUI package; <b>Obsolete</b> means no MAUI package exists (use the MAUI built-in or rewrite); <b>Unverified</b> means the control is not in the verified mapping table and must be investigated - do not infer <code>Syncfusion.Maui.&lt;X&gt;</code>.</p>'
     Add-Html '<table><tr><th>Xamarin package</th><th>Version</th><th>Classification</th><th>.NET MAUI package / action</th></tr>'
     $kindClass = @{ 'Exact replacement'='verify'; 'Obsolete'='obsolete'; 'Unverified'='unverified' }
     $ordered = $syncfusionFound | Sort-Object @{E={ switch ($_.Kind) { 'Exact replacement' {0} 'Obsolete' {1} default {2} } }}, From
