@@ -62,12 +62,53 @@ param(
     [string] $OutputPath,
     [switch] $SkipReport,
     [switch] $IncludeTestProjects,
-    [int]    $MaxFileSizeKB = 2048
+    [int]    $MaxFileSizeKB = 2048,
+    [string] $AsOfDate,
+    [switch] $Force,
+    [int]    $TargetMauiVersion = 10
 )
 
 $ErrorActionPreference = 'Stop'
-$script:ToolVersion = '1.0.0'
-$script:RuleSetDate = '2026-08-11'
+$script:ToolVersion = '1.1.0'
+$script:RuleSetDate = '2026-08-31'
+$script:AsOfDate   = $AsOfDate
+
+# ---- Input validation ------------------------------------------------------------------------
+if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+    throw "The -Path value '$Path' does not exist or is not a directory. Pass the folder containing your .sln file."
+}
+if ($MaxFileSizeKB -le 0) {
+    throw "-MaxFileSizeKB must be a positive integer. Got: $MaxFileSizeKB"
+}
+if ($TargetMauiVersion -notin @(9,10,11)) {
+    throw "-TargetMauiVersion must be one of 9, 10, or 11 (the supported/mainstream .NET MAUI lines). Got: $TargetMauiVersion"
+}
+if (-not $SkipReport -and $OutputPath) {
+    $outDir = Split-Path $OutputPath -Parent
+    if ($outDir -and -not (Test-Path -LiteralPath $outDir -PathType Container)) {
+        throw "The output directory '$outDir' does not exist."
+    }
+    if ((Test-Path -LiteralPath $OutputPath) -and -not $Force) {
+        throw "The output file '$OutputPath' already exists. Pass -Force to overwrite, or omit -OutputPath to get a default name with a numeric suffix."
+    }
+}
+elseif (-not $SkipReport -and -not $OutputPath) {
+    # Default name, suffixed to avoid silent overwrite of an existing default report.
+    $defaultOut = Join-Path (Get-Location) 'xamarin-maui-migration-readiness.html'
+    if (Test-Path -LiteralPath $defaultOut) {
+        if ($Force) {
+            $OutputPath = $defaultOut
+        } else {
+            $i = 1
+            do {
+                $OutputPath = Join-Path (Get-Location) "xamarin-maui-migration-readiness-$i.html"
+                $i++
+            } while (Test-Path -LiteralPath $OutputPath)
+        }
+    } else {
+        $OutputPath = $defaultOut
+    }
+}
 
 # ==============================================================================================
 #  KNOWLEDGE BASE
@@ -130,7 +171,7 @@ $script:PackageRules = @(
     # --- Unmaintained: community fork exists, maintenance status must be checked ---------------
     @{ Id='Xamarin.FFImageLoading.Forms';      Status='Blocked';  Target='FFImageLoading.Maui (community fork)'; Note='The original is archived. A community MAUI fork exists; check its maintenance status before depending on it. MAUI Image plus a caching handler covers many cases.'; Confidence='Verify' }
     @{ Id='Xamarin.FFImageLoading';            Status='Blocked';  Target='FFImageLoading.Maui (community fork)'; Note='See FFImageLoading.Forms.'; Confidence='Verify' }
-    @{ Id='Acr.UserDialogs';                   Status='Blocked';  Target='CommunityToolkit.Maui popups + alerts'; Note='Acr.UserDialogs is archived with no official MAUI release. Budget a rewrite of every dialog call site.' }
+    @{ Id='Acr.UserDialogs';                   Status='Check';    Target='Acr.UserDialogs.Maui'; Note='The official repository ships Acr.UserDialogs.Maui (see github.com/aritchie/userdialogs, v9.0 branch). Validate its maintenance status, supported target frameworks, platform coverage, and compatibility with your intended .NET MAUI version before depending on it.'; Confidence='Verify' }
     @{ Id='FreshMvvm';                         Status='Blocked';  Target='Community port, or move to Shell + DI'; Note='No official MAUI release. Most teams take this as the moment to adopt Shell navigation.'; Confidence='Verify' }
     @{ Id='Xamarin.Forms.PancakeView';         Status='Blocked';  Target='Border, or a community port';          Note='MAUI Border covers corner radius, shadow and gradient stroke for most PancakeView usage.'; Confidence='Verify' }
     @{ Id='Lottie.Forms';                      Status='Replaced'; Target='SkiaSharp.Extended.UI.Maui (SKLottieView)' }
@@ -201,6 +242,46 @@ $script:SyncfusionMap = [ordered]@{
     'Syncfusion.Xamarin.SfBusyIndicator'   = 'Syncfusion.Maui.Core'
     'Syncfusion.Xamarin.SfProgressBar'     = 'Syncfusion.Maui.ProgressBar'
     'Syncfusion.Xamarin.SfBarcode'         = 'Syncfusion.Maui.Barcode'
+    'Syncfusion.Xamarin.SfRangeSlider'     = 'Syncfusion.Maui.Sliders'
+    'Syncfusion.Xamarin.SfPullToRefresh'   = 'Syncfusion.Maui.PullToRefresh'
+    # ---- Added 2026-08-31: verified against the official migration table ----
+    'Syncfusion.Xamarin.SfAccordion'       = 'Syncfusion.Maui.Expander'
+    'Syncfusion.Xamarin.SfAvatarView'      = 'Syncfusion.Maui.Core'
+    'Syncfusion.Xamarin.SfBackdropPage'    = 'Syncfusion.Maui.Backdrop'
+    'Syncfusion.Xamarin.SfCardView'        = 'Syncfusion.Maui.Cards'
+    'Syncfusion.Xamarin.SfChat'            = 'Syncfusion.Maui.Chat'
+    'Syncfusion.Xamarin.SfChips'           = 'Syncfusion.Maui.Core'
+    'Syncfusion.Xamarin.SfDataForm'        = 'Syncfusion.Maui.DataForm'
+    'Syncfusion.Xamarin.SfDigitalGauge'    = 'Syncfusion.Maui.Gauges'
+    'Syncfusion.Xamarin.SfEffectsView'     = 'Syncfusion.Maui.Core'
+    'Syncfusion.Xamarin.SfExpander'        = 'Syncfusion.Maui.Expander'
+    'Syncfusion.Xamarin.SfKanban'          = 'Syncfusion.Maui.Kanban'
+    'Syncfusion.Xamarin.SfParallaxView'    = 'Syncfusion.Maui.ParallaxView'
+    'Syncfusion.Xamarin.SfRadialMenu'      = 'Syncfusion.Maui.RadialMenu'
+    'Syncfusion.Xamarin.SfRotator'         = 'Syncfusion.Maui.Rotator'
+    'Syncfusion.Xamarin.SfShimmer'         = 'Syncfusion.Maui.Core'
+    'Syncfusion.Xamarin.SfSignaturePad'    = 'Syncfusion.Maui.SignaturePad'
+    'Syncfusion.Xamarin.SfSparkline'       = 'Syncfusion.Maui.Sparkline'
+    'Syncfusion.Xamarin.SfStepProgressBar' = 'Syncfusion.Maui.StepProgressBar'
+    'Syncfusion.Xamarin.SfSunburstChart'   = 'Syncfusion.Maui.SunburstChart'
+    'Syncfusion.Xamarin.SfTreemap'         = 'Syncfusion.Maui.TreeMap'
+    'Syncfusion.Xamarin.SfSegmentedControl' = 'Syncfusion.Maui.SegmentedControl'
+    'Syncfusion.Xamarin.SfBackdrop'        = 'Syncfusion.Maui.Backdrop'
+}
+
+# Obsolete / under-way markers (official migration table). These control packages have
+# no verified MAUI NuGet replacement. They must NOT be invented.
+$script:SyncfusionObsolete = @(
+    'Syncfusion.Xamarin.SfBorder',        # Obsolete - use MAUI Border
+    'Syncfusion.Xamarin.SfGradientView',   # Obsolete - use MAUI Gradients
+    'Syncfusion.Xamarin.SfDiagram'         # Obsolete - use Syncfusion Blazor Diagram (via MAUI hybrid); no MAUI UI package
+)
+
+# Per-package obsolete guidance text, so the report is actionable rather than just "obsolete".
+$script:SyncfusionObsoleteNotes = @{
+    'Syncfusion.Xamarin.SfBorder'      = 'SfBorder is obsolete in .NET MAUI. Use the built-in MAUI Border control, which provides StrokeShape, Background and Corner Radius.'
+    'Syncfusion.Xamarin.SfGradientView'= 'SfGradientView is obsolete in .NET MAUI. Use the built-in MAUI gradient brushes (LinearGradientBrush, RadialGradientBrush) directly on a control Background or a Shape Fill.'
+    'Syncfusion.Xamarin.SfDiagram'      = 'SfDiagram has no .NET MAUI UI package. Syncfusion directs you to the Blazor Diagram component hosted in a MAUI hybrid (BlazorWebView) page. This is an architectural change, not a drop-in package swap.'
 }
 
 # ---- Source-code API rules --------------------------------------------------------------------
@@ -212,31 +293,35 @@ $script:ApiRules = @(
        Title='Renderer class'; Severity='High'; Category='Renderer'
        Fix='Port to a handler. The nearest equivalent of OnElementChanged is CreatePlatformView / ConnectHandler.' }
     @{ Pattern='\[assembly\s*:\s*ExportEffect\s*\('; Title='Platform effect registration'; Severity='Medium'; Category='Effect'
-       Fix='Effects still work in MAUI but are legacy. Prefer a handler mapping; if you keep the effect, the registration attribute stays but namespaces change.' }
+       Fix='In .NET MAUI the Xamarin.Forms ExportEffect and ResolutionGroupName attributes are removed. Delete both attributes, port the effect implementation, register it with builder.ConfigureEffects in MauiProgram, and validate the platform-specific implementations.' }
     @{ Pattern='class\s+\w+\s*:\s*(?:\w+\.)*PlatformEffect\b'; Title='PlatformEffect implementation'; Severity='Medium'; Category='Effect'
-       Fix='Consider a handler property mapper instead, which is the maintained path in MAUI.' }
+       Fix='Effects are removed from .NET MAUI. Port the implementation and register it via builder.ConfigureEffects in MauiProgram; validate the platform-specific implementations. A handler property mapper is the maintained alternative when that is a better fit.' }
     @{ Pattern='\[assembly\s*:\s*Dependency\s*\('; Title='DependencyService registration'; Severity='Medium'; Category='DI'
        Fix='DependencyService is obsolete. Register the implementation in MauiProgram via builder.Services and inject it.' }
     @{ Pattern='DependencyService\s*\.\s*(Get|Resolve)\s*<'; Title='DependencyService resolution'; Severity='Medium'; Category='DI'
        Fix='Replace with constructor injection from the MAUI service container.' }
     @{ Pattern='\bMessagingCenter\s*\.'; Title='MessagingCenter usage'; Severity='Medium'; Category='API'
-       Fix='MessagingCenter is obsolete in .NET 9 and later. Move to WeakReferenceMessenger from CommunityToolkit.Mvvm.' }
+       Fix='MessagingCenter is deprecated in .NET MAUI 10. Move to WeakReferenceMessenger from CommunityToolkit.Mvvm, or another messenger approach; treat this as guidance, not a single required replacement.' }
     @{ Pattern='\bDevice\s*\.\s*RuntimePlatform\b'; Title='Device.RuntimePlatform'; Severity='Medium'; Category='API'
-       Fix='The Device class was removed. Use DeviceInfo.Current.Platform.' }
+       Fix='The Device class was removed. Use DeviceInfo.Current.Platform. Note that this returns a DevicePlatform enum value, not the string value that Device.RuntimePlatform returned.' }
     @{ Pattern='\bDevice\s*\.\s*BeginInvokeOnMainThread\b'; Title='Device.BeginInvokeOnMainThread'; Severity='Low'; Category='API'
        Fix='Use MainThread.BeginInvokeOnMainThread.' }
     @{ Pattern='\bDevice\s*\.\s*StartTimer\b'; Title='Device.StartTimer'; Severity='Medium'; Category='API'
-       Fix='Use Application.Current.Dispatcher.StartTimer, or a PeriodicTimer.' }
-    @{ Pattern='\bDevice\s*\.\s*(OpenUri|Idiom|Info|GetNamedSize|Styles)\b'; Title='Device class member'; Severity='Medium'; Category='API'
-       Fix='The Device class was removed. OpenUri becomes Launcher.OpenAsync; Idiom becomes DeviceInfo.Current.Idiom.' }
+       Fix='Use Application.Current.Dispatcher.StartTimer, or a PeriodicTimer. Validate lifecycle behaviour: the dispatcher timer is tied to the application dispatcher and may stop firing when the app or page is backgrounded, unlike a bare PeriodicTimer.' }
+    @{ Pattern='\bDevice\s*\.\s*GetNamedSize\b'; Title='Device.GetNamedSize'; Severity='Medium'; Category='API'
+       Fix='There is no reliable universal one-to-one replacement for Device.GetNamedSize in .NET MAUI. Do not substitute Launcher, DeviceInfo.Current.Platform, or DeviceInfo.Current.Idiom. As of .NET MAUI 10, Device.GetNamedSize is not on the .NET MAUI API surface. Replace each call with an explicit numeric FontSize, or centralise sizes in named Styles/Application.Resources for consistent typography. Preserve font auto-scaling (do not disable it) unless the app has a documented accessibility reason. Validate the rendered sizes visually across controls and platforms, because named-size mapping is no longer available for cross-checking.' }
+    @{ Pattern='\bDevice\s*\.\s*(OpenUri|Idiom|Info|Styles)\b'; Title='Device class member'; Severity='Medium'; Category='API'
+       Fix='The Device class was removed. OpenUri becomes Launcher.Default.OpenAsync; Idiom becomes DeviceInfo.Current.Idiom; Info becomes DeviceInfo.Current. Use the mapped member directly.' }
     @{ Pattern='Application\s*\.\s*Current\s*\.\s*Properties\b'; Title='Application.Properties dictionary'; Severity='High'; Category='API'
        Fix='Removed in MAUI. Migrate stored values to Preferences, and write a one-time upgrade path for existing installs or users lose their data.' }
     @{ Pattern='\bMicrosoft\.Maui\.Controls\.Compatibility\b'; Title='Compatibility namespace'; Severity='High'; Category='NET11'
        Fix='Microsoft.Maui.Controls.Compatibility does not ship in .NET 11. Anything relying on it must be ported before you can move to .NET 11.' }
     @{ Pattern='using\s+Xamarin\.Forms\s*;'; Title='Xamarin.Forms namespace import'; Severity='Low'; Category='Namespace'
        Fix='Becomes Microsoft.Maui.Controls. Largely mechanical; the Upgrade Assistant handles most of these.' }
-    @{ Pattern='\bExportFont\b|\bExportRendererAttribute\b'; Title='Assembly-level Xamarin attribute'; Severity='Low'; Category='Namespace'
-       Fix='Fonts are registered in MauiProgram with ConfigureFonts.' }
+    @{ Pattern='\bExportFont\b'; Title='ExportFont assembly attribute'; Severity='Low'; Category='Namespace'
+       Fix='Fonts are registered in MauiProgram with ConfigureFonts instead of an assembly-level ExportFont attribute.' }
+    @{ Pattern='\bExportRendererAttribute\b'; Title='ExportRenderer assembly attribute'; Severity='High'; Category='Renderer'
+       Fix='ExportRenderer has no .NET MAUI equivalent. Port the renderer to a handler and register it in MauiProgram with ConfigureMauiHandlers, or via a handler mapping. Remove the assembly-level export attribute.' }
 )
 
 $script:XamlRules = @(
@@ -363,6 +448,198 @@ function ConvertTo-HtmlText {
     return ($Text -replace '&','&amp;' -replace '<','&lt;' -replace '>','&gt;' -replace '"','&quot;')
 }
 
+# Strip C#/XAML comments and string literals while preserving line numbers and offsets, so
+# findings always point at the original location and we do not match patterns inside comments
+# or string literals. Returns a string of the same length as the input.
+function Remove-CommentsAndLiterals {
+    param([string]$Text)
+    if ($null -eq $Text -or $Text.Length -eq 0) { return $Text }
+    $sb = New-Object System.Text.StringBuilder $Text
+    $replacements = New-Object System.Collections.ArrayList
+
+    # C# block comments  /* ... */
+    foreach ($m in [regex]::Matches($Text, '/\*[\s\S]*?\*/')) {
+        [void]$replacements.Add(@($m.Index, $m.Length))
+    }
+    # C# line comments  // ...  (not preceded by ':')
+    foreach ($m in [regex]::Matches($Text, '(?<![:/])//[^\r\n]*')) {
+        [void]$replacements.Add(@($m.Index, $m.Length))
+    }
+    # C# verbatim @"..." and normal "..." string literals
+    foreach ($m in [regex]::Matches($Text, '@?"(?:[^"\\]|\\.)*"')) {
+        [void]$replacements.Add(@($m.Index, $m.Length))
+    }
+    foreach ($m in [regex]::Matches($Text, '(?<!@)"(?:[^"\\\r\n]|\\.)*"')) {
+        [void]$replacements.Add(@($m.Index, $m.Length))
+    }
+    # XAML / XML comments  <!-- ... -->  and CDATA sections
+    foreach ($m in [regex]::Matches($Text, '<!--[\s\S]*?-->')) {
+        [void]$replacements.Add(@($m.Index, $m.Length))
+    }
+    foreach ($m in [regex]::Matches($Text, '<!\[CDATA\[[\s\S]*?\]\]>')) {
+        [void]$replacements.Add(@($m.Index, $m.Length))
+    }
+
+    # Replace each masked region with spaces, preserving length and thus line numbers.
+    foreach ($r in $replacements) {
+        for ($i = 0; $i -lt $r[1]; $i++) { [void]$sb.Remove($r[0], 1) }
+        [void]$sb.Insert($r[0], (' ' * $r[1]))
+    }
+    return $sb.ToString()
+}
+
+# Resolve a version property reference like $(SomePackageVersion) against an in-memory
+# property map (imports default.props first if loaded). Returns the resolved string or $null.
+function Resolve-VersionProperty {
+    param([string]$Version, [hashtable]$PropertyMap)
+    if (-not $Version) { return $null }
+    if ($Version -notmatch '\$\(([^)]+)\)') { return $Version }
+    $propName = $Matches[1]
+    if ($PropertyMap -and $PropertyMap.ContainsKey($propName)) { return $PropertyMap[$propName] }
+    return $null
+}
+
+# Safe XML parser for project/DPM files. Uses XmlReader with ConformanceLevel.Auto and
+# DtdProcessing.Prohibited so no external entities or remote resources are ever resolved.
+function New-SafeXmlReader {
+    param([string]$Text)
+    $sr = New-Object System.IO.StringReader($Text)
+    $settings = New-Object System.Xml.XmlReaderSettings
+    $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+    $settings.ConformanceLevel = [System.Xml.ConformanceLevel]::Auto
+    return [System.Xml.XmlReader]::Create($sr, $settings)
+}
+
+function Register-Package {
+    param($Packages, [string]$Id, [string]$Version, [string]$ProjectName, [string]$Source)
+    if (-not $Id) { return }
+    $verSrc = if ($Version) { 'attribute/element in ' + $Source } else { $null }
+    if (-not $Packages.ContainsKey($Id)) {
+        $Packages[$Id] = @{ Version = $Version; VersionSource = $verSrc; VersionUnresolved = $false; Projects = @() }
+    } else {
+        if ($Version -and -not $Packages[$Id].Version) {
+            $Packages[$Id].Version = $Version
+            $Packages[$Id].VersionSource = $verSrc
+        }
+        elseif ($Version -and $Packages[$Id].Version -ne $Version) {
+            $Packages[$Id].VersionSource += "; $Version in $Source"
+        }
+    }
+    $Packages[$Id].Projects += $ProjectName
+}
+
+# Parse <PackageReference> and <PackageVersion> entries (the latter for Central Package
+# Management) from raw project / props text using a safe XmlReader. Handles Include/Version
+# attribute order, nested <Version> elements, Update= forms and arbitrary xmlns prefixes.
+function Add-PackageReferences {
+    param([string]$Text, [string]$ProjectName, $Packages, [string]$Source)
+    if (-not $Text) { return }
+    try {
+        $reader = New-SafeXmlReader -Text $Text
+        $localNs = $false
+        while ($reader.Read()) {
+            if ($reader.NodeType -eq [System.Xml.XmlNodeType]::Element -and
+                ($reader.LocalName -eq 'PackageReference' -or $reader.LocalName -eq 'PackageVersion')) {
+                $elementName = $reader.LocalName
+                $id = $null; $verAttr = $null; $isUpdate = $false
+                $attrCount = $reader.AttributeCount
+                if ($attrCount -gt 0) {
+                    [void]$reader.MoveToFirstAttribute()
+                    for ($a = 0; $a -lt $attrCount; $a++) {
+                        if ($reader.LocalName -eq 'Include') { $id = $reader.Value }
+                        elseif ($reader.LocalName -eq 'Update') { $id = $reader.Value; $isUpdate = $true }
+                        elseif ($reader.LocalName -eq 'Version') { $verAttr = $reader.Value }
+                        if (-not $reader.ReadAttributeValue()) { }
+                        $reader.MoveToNextAttribute() | Out-Null
+                    }
+                    $reader.MoveToElement() | Out-Null
+                }
+                if (-not $id) { continue }
+                $srcLabel = if ($elementName -eq 'PackageVersion') { "$Source (central PackageVersion)" } else { $Source }
+                if ($isUpdate) {
+                    if ($verAttr) { Register-Package -Packages $Packages -Id $id -Version $verAttr -ProjectName $ProjectName -Source "$srcLabel (Update)" }
+                    else { Register-Package -Packages $Packages -Id $id -Version $null -ProjectName $ProjectName -Source "$srcLabel (Update)" }
+                }
+                $innerVer = $null
+                if ($reader.IsEmptyElement) {
+                    Register-Package -Packages $Packages -Id $id -Version $verAttr -ProjectName $ProjectName -Source $srcLabel
+                    continue
+                }
+                $depth = $reader.Depth
+                while ($reader.Read() -and -not ($reader.NodeType -eq [System.Xml.XmlNodeType]::EndElement -and $reader.Depth -eq $depth -and $reader.LocalName -eq $elementName)) {
+                    if ($reader.NodeType -eq [System.Xml.XmlNodeType]::Element -and $reader.LocalName -eq 'Version') {
+                        $innerVer = $reader.ReadString()
+                    }
+                }
+                $finalVer = if ($verAttr) { $verAttr } elseif ($innerVer) { $innerVer } else { $null }
+                Register-Package -Packages $Packages -Id $id -Version $finalVer -ProjectName $ProjectName -Source $srcLabel
+            }
+        }
+        $reader.Close()
+    } catch {
+        foreach ($m in [regex]::Matches($Text, '<PackageReference\s+[^>]*?(?:Include|Update)\s*=\s*"([^"]+)"[^>]*?>(?:\s*<Version>\s*([^<]+?)\s*</Version>)?')) {
+            Register-Package -Packages $Packages -Id $m.Groups[1].Value -Version ($m.Groups[2].Value) -ProjectName $ProjectName -Source "$Source (regex fallback)"
+        }
+    }
+}
+
+function Add-PackagesConfig {
+    param([string]$Text, [string]$ProjectName, $Packages, [string]$Source)
+    if (-not $Text) { return }
+    try {
+        $reader = New-SafeXmlReader -Text $Text
+        while ($reader.Read()) {
+            if ($reader.NodeType -eq [System.Xml.XmlNodeType]::Element -and $reader.LocalName -eq 'package') {
+                $id = $null; $ver = $null
+                $attrCount = $reader.AttributeCount
+                if ($attrCount -gt 0) {
+                    [void]$reader.MoveToFirstAttribute()
+                    for ($a = 0; $a -lt $attrCount; $a++) {
+                        if ($reader.LocalName -eq 'id') { $id = $reader.Value }
+                        elseif ($reader.LocalName -eq 'version') { $ver = $reader.Value }
+                        $reader.MoveToNextAttribute() | Out-Null
+                    }
+                    $reader.MoveToElement() | Out-Null
+                }
+                if ($id) { Register-Package -Packages $Packages -Id $id -Version $ver -ProjectName $ProjectName -Source $Source }
+            }
+        }
+        $reader.Close()
+    } catch {
+        foreach ($m in [regex]::Matches($Text, '<package\s+id\s*=\s*"([^"]+)"\s+version\s*=\s*"([^"]*)"')) {
+            Register-Package -Packages $Packages -Id $m.Groups[1].Value -Version $m.Groups[2].Value -ProjectName $ProjectName -Source "$Source (regex fallback)"
+        }
+    }
+}
+
+# Collect <PropertyGroup> scalar values into a property map so $(SomePackageVersion)
+# references in PackageReference Version attributes can be resolved.
+function Add-VersionProperties {
+    param([string]$Text, [hashtable]$PropertyMap)
+    if (-not $Text) { return }
+    try {
+        $reader = New-SafeXmlReader -Text $Text
+        while ($reader.Read()) {
+            if ($reader.NodeType -eq [System.Xml.XmlNodeType]::Element -and $reader.LocalName -eq 'PropertyGroup') {
+                if ($reader.IsEmptyElement) { continue }
+                $depth = $reader.Depth
+                while ($reader.Read() -and -not ($reader.NodeType -eq [System.Xml.XmlNodeType]::EndElement -and $reader.Depth -eq $depth -and $reader.LocalName -eq 'PropertyGroup')) {
+                    if ($reader.NodeType -eq [System.Xml.XmlNodeType]::Element) {
+                        $propName = $reader.LocalName
+                        if (-not $reader.IsEmptyElement) {
+                            $val = $reader.ReadString()
+                            if ($val -and -not $val.Contains('$(')) {
+                                if (-not $PropertyMap.ContainsKey($propName)) { $PropertyMap[$propName] = $val }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        $reader.Close()
+    } catch { }
+}
+
 # ==============================================================================================
 #  SCAN
 # ==============================================================================================
@@ -376,8 +653,28 @@ Write-Host ""
 
 $findings   = New-Object System.Collections.ArrayList
 $projects   = New-Object System.Collections.ArrayList
-$packages   = @{}   # id -> @{ Version, Projects[] }
+$packages   = @{}   # id -> @{ Version, VersionSource, VersionUnresolved, Projects[] }
 $scanErrors = New-Object System.Collections.ArrayList
+
+# Scan-coverage counters (brief section 7). "Eligible" = discovered files that should be scanned,
+# after exclusion paths and test-project filtering are applied.
+$script:Coverage = [pscustomobject]@{
+    DiscoveredCs     = 0
+    DiscoveredXaml   = 0
+    DiscoveredProj   = 0
+    ScannedCs        = 0
+    ScannedXaml      = 0
+    OversizedCs      = 0
+    OversizedXaml    = 0
+    UnreadableCs     = 0
+    UnreadableXaml   = 0
+    ExcludedByTestCs = 0
+    ExcludedByTestXaml = 0
+}
+
+# Test-project roots (parent directories of excluded test projects) so files in nested
+# subfolders of a test project are excluded consistently across C#, XAML and project scans.
+$testProjectRoots = New-Object System.Collections.ArrayList
 
 # ---- Projects ---------------------------------------------------------------------------------
 Write-Step "Enumerating projects..."
@@ -390,7 +687,10 @@ $solutionFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.sln -File
 foreach ($pf in $projFiles) {
     $name = [System.IO.Path]::GetFileNameWithoutExtension($pf.Name)
     $isTest = Test-TestProject $name
-    if ($isTest -and -not $IncludeTestProjects) { continue }
+    if ($isTest -and -not $IncludeTestProjects) {
+        [void]$testProjectRoots.Add($pf.DirectoryName)
+        continue
+    }
 
     $text = Get-SafeContent -File $pf -MaxKB $MaxFileSizeKB
     if ($null -eq $text) { [void]$scanErrors.Add("Could not read $($pf.FullName)"); continue }
@@ -429,63 +729,135 @@ foreach ($pf in $projFiles) {
             -Category 'Project' -File $rel -Line 1 -Fix $k.Note -Evidence $name))
     }
 
-    # ---- packages: PackageReference ----
-    foreach ($m in [regex]::Matches($text, '<PackageReference\s+[^>]*Include\s*=\s*"([^"]+)"[^>]*?(?:Version\s*=\s*"([^"]+)")?')) {
-        $id = $m.Groups[1].Value; $ver = $m.Groups[2].Value
-        if (-not $packages.ContainsKey($id)) { $packages[$id] = @{ Version = $ver; Projects = @() } }
-        elseif ($ver -and -not $packages[$id].Version) { $packages[$id].Version = $ver }
-        $packages[$id].Projects += $name
-    }
+    # ---- packages: PackageReference (XML parsing) ----
+    # Replaces the previous regex parser so reversed attribute order, nested <Version>
+    # elements, Update= forms and XML namespaces are handled correctly.
+    Add-PackageReferences -Text $text -ProjectName $name -Packages $packages -Source $rel
 
     # ---- packages: packages.config ----
     $pc = Join-Path $pf.DirectoryName 'packages.config'
     if (Test-Path -LiteralPath $pc) {
         try {
             $pcText = Get-Content -LiteralPath $pc -Raw -ErrorAction Stop
-            foreach ($m in [regex]::Matches($pcText, '<package\s+id\s*=\s*"([^"]+)"\s+version\s*=\s*"([^"]*)"')) {
-                $id = $m.Groups[1].Value; $ver = $m.Groups[2].Value
-                if (-not $packages.ContainsKey($id)) { $packages[$id] = @{ Version = $ver; Projects = @() } }
-                $packages[$id].Projects += $name
-            }
+            Add-PackagesConfig -Text $pcText -ProjectName $name -Packages $packages -Source $pc
         } catch { [void]$scanErrors.Add("Could not read $pc") }
     }
 }
 Write-Step "$($projects.Count) project(s), $($solutionFiles.Count) solution file(s)"
 
+# ---- Central Package Management (Directory.Packages.props) -------------------------------------
+# Loaded once and merged into the package map so centrally-managed versions surface even
+# when the project file omits a Version property.
+$dppFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Filter 'Directory.Packages.props' -File -ErrorAction SilentlyContinue |
+    Where-Object { -not (Test-Excluded $_.FullName) })
+$centralPropertyMap = @{}
+foreach ($dpp in $dppFiles) {
+    $dppText = Get-SafeContent -File $dpp -MaxKB $MaxFileSizeKB
+    if ($null -eq $dppText) { continue }
+    Add-PackageReferences -Text $dppText -ProjectName '(central)' -Packages $packages -Source (Get-RelativePath -FullName $dpp.FullName -Root $root)
+    # Collect property/MSBuild <PropertyGroup> values for $(Version) resolution.
+    Add-VersionProperties -Text $dppText -PropertyMap $centralPropertyMap
+}
+
+# Also collect version properties from each project file (ProjectGRP, props imported in-tree).
+foreach ($pf in $projFiles) {
+    $pfText = Get-SafeContent -File $pf -MaxKB $MaxFileSizeKB
+    if ($null -eq $pfText) { continue }
+    Add-VersionProperties -Text $pfText -PropertyMap $centralPropertyMap
+}
+
+# Resolve $(SomePackageVersion) references in recorded versions where possible, and flag
+# unresolved versions instead of silently reporting a blank version.
+foreach ($id in @($packages.Keys)) {
+    $v = $packages[$id].Version
+    if ($v -and $v -match '\$\(') {
+        $resolved = Resolve-VersionProperty -Version $v -PropertyMap $centralPropertyMap
+        if ($resolved) {
+            $packages[$id].Version = $resolved
+            $packages[$id].VersionSource = "$($packages[$id].VersionSource) (resolved from property)"
+        } else {
+            $packages[$id].VersionUnresolved = $true
+        }
+    }
+}
+
 # ---- Source files -----------------------------------------------------------------------------
 Write-Step "Scanning C# source..."
 $csFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.cs -File -ErrorAction SilentlyContinue |
     Where-Object { -not (Test-Excluded $_.FullName) -and $_.Name -notmatch '\.(g|designer|generated)\.cs$' })
+$script:Coverage.DiscoveredCs = $csFiles.Count
+
+# Helper: returns true if a file lives under any excluded test-project root.
+function Test-UnderTestRoot {
+    param([string]$FullName)
+    foreach ($tr in $testProjectRoots) {
+        if ($FullName.StartsWith($tr, [StringComparison]::OrdinalIgnoreCase) -or
+            $FullName.StartsWith(($tr -replace '\\','/'), [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+}
 
 foreach ($f in $csFiles) {
-    if ((Test-TestProject ([System.IO.Path]::GetFileName($f.DirectoryName))) -and -not $IncludeTestProjects) { continue }
+    if ((Test-UnderTestRoot $f.FullName) -and -not $IncludeTestProjects) { $script:Coverage.ExcludedByTestCs++; continue }
     $text = Get-SafeContent -File $f -MaxKB $MaxFileSizeKB
-    if ($null -eq $text) { continue }
+    if ($null -eq $text) {
+        if ($f.Length -gt ($MaxFileSizeKB * 1KB)) { $script:Coverage.OversizedCs++ } else { $script:Coverage.UnreadableCs++ }
+        continue
+    }
+    $script:Coverage.ScannedCs++
+    $masked = Remove-CommentsAndLiterals -Text $text
     $rel = Get-RelativePath -FullName $f.FullName -Root $root
 
+    # Per-(rule,file,line,Evidence) aggregation so the same API on the same physical line
+    # produces one finding with an occurrence count, while different lines stay separate.
+    $lineEvidence = @{}
     foreach ($rule in $script:ApiRules) {
-        foreach ($m in [regex]::Matches($text, $rule.Pattern)) {
+        $ms = [regex]::Matches($masked, $rule.Pattern)
+        foreach ($m in $ms) {
             $line = Get-LineNumber -Text $text -Index $m.Index
             $ev = ($m.Value -replace '\s+',' ').Trim()
             if ($ev.Length -gt 120) { $ev = $ev.Substring(0,120) + '...' }
-            [void]$findings.Add((New-Finding -Title $rule.Title -Severity $rule.Severity `
-                -Category $rule.Category -File $rel -Line $line -Fix $rule.Fix -Evidence $ev))
+            $key = "$($rule.Title)|$rel|$line|$(($ev -replace '[^A-Za-z0-9]','').GetHashCode())"
+            if ($lineEvidence.ContainsKey($key)) {
+                $existing = $lineEvidence[$key]
+                $existing.Occurrences = $existing.Occurrences + 1
+            } else {
+                $new = New-Finding -Title $rule.Title -Severity $rule.Severity `
+                    -Category $rule.Category -File $rel -Line $line -Fix $rule.Fix -Evidence $ev
+                # Attach an occurrence count for the same-line aggregation note.
+                $new | Add-Member -NotePropertyName Occurrences -NotePropertyValue 1 -PassThru | Out-Null
+                $lineEvidence[$key] = $new
+            }
         }
     }
+    foreach ($k in $lineEvidence.Keys) {
+        $find = $lineEvidence[$k]
+        if ($find.Occurrences -gt 1) {
+            $find.Evidence = "$($find.Evidence)  (occurrences on line: $($find.Occurrences))"
+        }
+        [void]$findings.Add($find)
+    }
 }
-Write-Step "$($csFiles.Count) C# file(s)"
+Write-Step "$($csFiles.Count) C# file(s) discovered, $($script:Coverage.ScannedCs) scanned"
 
 # ---- XAML -------------------------------------------------------------------------------------
 Write-Step "Scanning XAML..."
 $xamlFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.xaml -File -ErrorAction SilentlyContinue |
     Where-Object { -not (Test-Excluded $_.FullName) })
+$script:Coverage.DiscoveredXaml = $xamlFiles.Count
 
 foreach ($f in $xamlFiles) {
+    if ((Test-UnderTestRoot $f.FullName) -and -not $IncludeTestProjects) { $script:Coverage.ExcludedByTestXaml++; continue }
     $text = Get-SafeContent -File $f -MaxKB $MaxFileSizeKB
-    if ($null -eq $text) { continue }
+    if ($null -eq $text) {
+        if ($f.Length -gt ($MaxFileSizeKB * 1KB)) { $script:Coverage.OversizedXaml++ } else { $script:Coverage.UnreadableXaml++ }
+        continue
+    }
+    $script:Coverage.ScannedXaml++
+    $masked = Remove-CommentsAndLiterals -Text $text
     $rel = Get-RelativePath -FullName $f.FullName -Root $root
     foreach ($rule in $script:XamlRules) {
-        $ms = [regex]::Matches($text, $rule.Pattern)
+        $ms = [regex]::Matches($masked, $rule.Pattern)
         if ($ms.Count -eq 0) { continue }
         # One finding per rule per file, with the count, rather than one per occurrence.
         $line = Get-LineNumber -Text $text -Index $ms[0].Index
@@ -494,7 +866,7 @@ foreach ($f in $xamlFiles) {
             -Category 'XAML' -File $rel -Line $line -Fix $rule.Fix -Evidence $ev))
     }
 }
-Write-Step "$($xamlFiles.Count) XAML file(s)"
+Write-Step "$($xamlFiles.Count) XAML file(s) discovered, $($script:Coverage.ScannedXaml) scanned"
 
 # ---- Packages ---------------------------------------------------------------------------------
 Write-Step "Evaluating $($packages.Count) NuGet package(s)..."
@@ -505,21 +877,47 @@ foreach ($id in ($packages.Keys | Sort-Object)) {
     $info = $packages[$id]
     $rule = $script:PackageRules | Where-Object { $_.Id -eq $id } | Select-Object -First 1
 
+    # Whether this package has an exact, verifiable MAUI replacement package id.
+    $exactReplacement = $false
     if (-not $rule) {
         foreach ($pr in $script:PackagePrefixRules) {
             if ($id.StartsWith($pr.Prefix, [StringComparison]::OrdinalIgnoreCase)) {
                 $target = $pr.Target
                 if ($pr.TargetFn -eq 'Syncfusion') {
-                    if ($script:SyncfusionMap.Contains($id)) { $target = $script:SyncfusionMap[$id] }
-                    else { $target = 'See help.syncfusion.com/maui/common/migration' }
-                    [void]$syncfusionFound.Add([pscustomobject]@{ From=$id; To=$target; Version=$info.Version })
+                    if ($script:SyncfusionMap.Contains($id)) {
+                        $target = $script:SyncfusionMap[$id]
+                        $exactReplacement = $true
+                        [void]$syncfusionFound.Add([pscustomobject]@{ From=$id; To=$target; Version=$info.Version; Kind='Exact replacement' })
+                    }
+                    elseif ($script:SyncfusionObsolete -contains $id) {
+                        $target = 'Obsolete - no Syncfusion .NET MAUI package. Use the MAUI built-in equivalent (see note) or a manual rewrite.'
+                        $exactReplacement = $false
+                        [void]$syncfusionFound.Add([pscustomobject]@{ From=$id; To=$target; Version=$info.Version; Kind='Obsolete' })
+                    }
+                    else {
+                        $target = 'No verified exact MAUI package - investigation required (do not infer Syncfusion.Maui.<X>)'
+                        [void]$syncfusionFound.Add([pscustomobject]@{ From=$id; To=$target; Version=$info.Version; Kind='Unverified' })
+                    }
                 }
-                $rule = @{ Id=$id; Status=$pr.Status; Target=$target; Note=$pr.Note }
+                # Obsolete Syncfusion controls become Blocked with their specific note, since they
+                # have no MAUI package to rename to.
+                if ($script:SyncfusionObsolete -contains $id) {
+                    $obsNote = $script:SyncfusionObsoleteNotes[$id]
+                    $rule = @{ Id=$id; Status='Blocked'; Target=$target; Note=$obsNote; Confidence='Verify' }
+                } else {
+                    $rule = @{ Id=$id; Status=$pr.Status; Target=$target; Note=$pr.Note }
+                }
                 break
             }
         }
     }
     if (-not $rule) { $rule = @{ Id=$id; Status='Unknown'; Target=''; Note='' } }
+
+    # If the exact id matched a PackageRules entry that names a concrete successor, count that
+    # as an exact replacement too (e.g. SkiaSharp.Views.Forms -> SkiaSharp.Views.Maui.Controls).
+    if (-not $exactReplacement -and $rule.Target -and $rule.Target -notmatch ' ' -and $rule.Status -in @('Renamed','Replaced')) {
+        $exactReplacement = $true
+    }
 
     $sev = switch ($rule.Status) {
         'Blocked'  { 'Critical' }
@@ -529,23 +927,64 @@ foreach ($id in ($packages.Keys | Sort-Object)) {
         'Builtin'  { 'Low' }
         default    { 'Info' }
     }
+    if ($info.VersionUnresolved) {
+        $sev = 'Medium'   # An unresolved version lowers confidence; surface it.
+    }
 
     [void]$packageResults.Add([pscustomobject]@{
-        Id = $id; Version = $info.Version; Status = $rule.Status; Target = $rule.Target
+        Id = $id; Version = $info.Version; VersionUnresolved = [bool]$info.VersionUnresolved
+        VersionSource = $info.VersionSource
+        Status = $rule.Status; Target = $rule.Target
         Note = $rule.Note; Severity = $sev; Confidence = $rule.Confidence
+        ExactReplacement = $exactReplacement
         Projects = (($info.Projects | Select-Object -Unique) -join ', ')
     })
 
     if ($rule.Status -in @('Blocked','Replaced','Check','Renamed')) {
         $fix = if ($rule.Target) { "Replace with: $($rule.Target). $($rule.Note)" } else { $rule.Note }
+        $evidence = "$id $($info.Version)"
+        if ($info.VersionUnresolved) { $evidence = "$id (version unresolved)" }
         [void]$findings.Add((New-Finding -Title "Package: $id" -Severity $sev -Category 'Package' `
-            -File 'NuGet dependencies' -Line 0 -Fix $fix.Trim() -Evidence "$id $($info.Version)"))
+            -File 'NuGet dependencies' -Line 0 -Fix $fix.Trim() -Evidence $evidence))
     }
 }
 
 # ==============================================================================================
 #  SCORE AND EFFORT
 # ==============================================================================================
+
+# ---- Deduplicate findings before scoring (brief section 6) ----------------------------------
+# Stable key: Title|CanonicalFile|Line. Where the same API recurs on one line we already
+# aggregated occurrences above; here we drop any remaining near-identical rows so the same
+# evidence cannot inflate the score or effort estimate.
+$deduped = New-Object System.Collections.ArrayList
+$seen = @{}
+foreach ($f in $findings) {
+    $key = "$($f.Title)|$($f.File)|$($f.Line)"
+    if ($seen.ContainsKey($key)) { continue }
+    $seen[$key] = $true
+    [void]$deduped.Add($f)
+}
+$findings = $deduped
+
+# ---- Scan coverage & confidence (brief sections 7 and 10) -----------------------------------
+$eligibleCs   = $script:Coverage.DiscoveredCs - $script:Coverage.OversizedCs - $script:Coverage.UnreadableCs
+$eligibleXaml = $script:Coverage.DiscoveredXaml - $script:Coverage.OversizedXaml - $script:Coverage.UnreadableXaml
+$scannedTotal = $script:Coverage.ScannedCs + $script:Coverage.ScannedXaml
+$eligibleTotal = $eligibleCs + $eligibleXaml
+$coveragePct = if ($eligibleTotal -gt 0) { [math]::Round(100 * $scannedTotal / $eligibleTotal, 1) } else { 100 }
+$incompleteCoverage = ($eligibleTotal -gt 0 -and $scannedTotal -lt $eligibleTotal)
+
+# Confidence level (separate from readiness): falls when files were skipped or versions are unresolved.
+$unknownPackages = @($packageResults | Where-Object { $_.Status -eq 'Unknown' -or $_.VersionUnresolved }).Count
+$confidenceFactors = 0
+if ($incompleteCoverage) { $confidenceFactors++ }
+if ($unknownPackages -gt 0) { $confidenceFactors++ }
+$confidence = switch ($confidenceFactors) {
+    0 { 'High' }
+    1 { 'Medium' }
+    default { 'Low' }
+}
 
 $sevOrder = @{ 'Critical'=0; 'High'=1; 'Medium'=2; 'Low'=3; 'Info'=4 }
 $byCat = $findings | Group-Object Category
@@ -623,7 +1062,7 @@ $highDays = [math]::Max(2, [math]::Round(($totalHours * 1.4) / 8, 0))
 # reader nothing and makes every messy codebase look identical. Instead the penalty is normalised
 # by codebase size and passed through an exponential decay, so the score always differentiates and
 # never quite reaches zero. A large app with many findings is not automatically worse off than a
-# small app with a few — what matters is blocker density.
+# small app with a few - what matters is blocker density.
 #
 #   penalty = 10*critical + 4*high + 1*medium + 0.2*low
 #   scale   = 40 + 8*projects + 0.4*sourceFiles
@@ -632,17 +1071,62 @@ $highDays = [math]::Max(2, [math]::Round(($totalHours * 1.4) / 8, 0))
 # The constants are judgement, not measurement. They are exposed here so a reader can disagree
 # with them and recompute.
 $penalty   = ($counts.Critical * 10) + ($counts.High * 4) + ($counts.Medium * 1) + ($counts.Low * 0.2)
-$sizeScale = 40 + (8 * $projects.Count) + (0.4 * ($csFiles.Count + $xamlFiles.Count))
+# Use successfully *scanned* (not merely discovered) file counts, so skipped/oversized files
+# do not inflate the size scale and award a higher score (brief section 10).
+$scannedFilesForScale = $script:Coverage.ScannedCs + $script:Coverage.ScannedXaml
+$sizeScale = 40 + (8 * $projects.Count) + (0.4 * $scannedFilesForScale)
 if ($sizeScale -le 0) { $sizeScale = 40 }
+
+# ---- Is this actually a Xamarin project? (brief section 8) ----------------------------------
+# Look for concrete Xamarin evidence before producing a readiness score. Without it, a
+# plain .NET project that happens to have no findings would otherwise read 100/100, which
+# is misleading: there is nothing to migrate *to*.
+$xamarinEvidence = @()
+
+# 1. A Xamarin.Forms / Xamarin.Essentials package reference or Xamarin.* prefix package.
+$xamarinPkgs = @($packages.Keys | Where-Object { $_ -like 'Xamarin.*' -or $_ -like 'Xam.Plugin.*' -or $_ -like 'Plugin.*' })
+if ($xamarinPkgs.Count -gt 0) { $xamarinEvidence += "NuGet package references: $($xamarinPkgs.Count) Xamarin/prefixed package(s)" }
+
+# 2. Project file targets the Xamarin platform ( Xamarin.Android / Xamarin.iOS / UAP ).
+$xamarinProjects = @($projects | Where-Object { $_.Kinds -match 'Xamarin|UWP|iOS|Android|Mac|tvOS|watchOS|Tizen' })
+if ($xamarinProjects.Count -gt 0) { $xamarinEvidence += "Project types: $($xamarinProjects.Count) Xamarin/UWP project(s)" }
+
+# 3. Source-level Xamarin namespaces or APIs detected as findings (Namespace/Xamarin.Forms import).
+$xamarinApiFindings = @($findings | Where-Object { $_.Category -eq 'Namespace' -or $_.Title -like '*Xamarin*' })
+if ($xamarinApiFindings.Count -gt 0) { $xamarinEvidence += "Source: $($xamarinApiFindings.Count) Xamarin namespace/API finding(s)" }
+
+$isXamarinProject = ($xamarinEvidence.Count -gt 0)
+
 $score = [math]::Round(100 * [math]::Exp(-1 * $penalty / $sizeScale), 0)
 $score = [math]::Max(1, [math]::Min(100, $score))
-$band = if ($score -ge 70) { 'Straightforward' } elseif ($score -ge 45) { 'Moderate' } elseif ($score -ge 25) { 'Substantial' } else { 'Major' }
+
+# If there is no Xamarin evidence, this is not a Xamarin migration candidate. Do not show
+# a 100/100 migration readiness score; surface a 'not a Xamarin project' verdict instead.
+if (-not $isXamarinProject -and -not $nothingFound) {
+    $notXamarin = $true
+} else {
+    $notXamarin = $false
+}
+
+# Critical blockers must prevent a green / 'Straightforward' result (brief section 10).
+if ($counts.Critical -gt 0 -and $score -ge 70) {
+    $score = 69
+}
+$band = if ($notXamarin) { 'Not a Xamarin project' }
+       elseif ($score -ge 70) { 'Straightforward' }
+       elseif ($score -ge 45) { 'Moderate' }
+       elseif ($score -ge 25) { 'Substantial' }
+       else { 'Major' }
 
 # Deadline maths
-$playDeadline = Get-Date '2026-08-31'
-$playExt      = Get-Date '2026-11-01'
-$daysToPlay   = [math]::Ceiling(($playDeadline - (Get-Date)).TotalDays)
-$daysToExt    = [math]::Ceiling(($playExt - (Get-Date)).TotalDays)
+$playDeadline = [datetime](Get-Date '2026-08-31')
+$playExt      = [datetime](Get-Date '2026-11-01')
+if ($script:AsOfDate) {
+    try { $script:AsOfDate = [datetime](Get-Date $script:AsOfDate) } catch { $script:AsOfDate = $null }
+}
+$refNow = if ($script:AsOfDate) { [datetime]$script:AsOfDate } else { [datetime](Get-Date) }
+$daysToPlay   = [int][math]::Ceiling(($playDeadline - $refNow).TotalDays)
+$daysToExt    = [int][math]::Ceiling(($playExt - $refNow).TotalDays)
 
 # ==============================================================================================
 #  CONSOLE SUMMARY
@@ -658,19 +1142,38 @@ if ($nothingFound) {
 }
 else {
     Write-Host "Result" -ForegroundColor Cyan
-    Write-Host "  Readiness score      $score / 100  ($band)"
+    if ($notXamarin) {
+        Write-Host "  Verdict              Not a Xamarin project" -ForegroundColor Magenta
+        Write-Host "  No concrete Xamarin evidence was found (no Xamarin packages, no Xamarin/UWP project" -ForegroundColor DarkGray
+        Write-Host "  types, no Xamarin.Forms namespace imports). A .NET project with no findings is not" -ForegroundColor DarkGray
+        Write-Host "  a 100/100 migration candidate - there is nothing to migrate. Checked for:" -ForegroundColor DarkGray
+        foreach ($e in $xamarinEvidence) { Write-Host "    - $e" -ForegroundColor DarkGray }
+        if ($xamarinEvidence.Count -eq 0) { Write-Host "    - Xamarin.* / Plugin.* package references" -ForegroundColor DarkGray; Write-Host "    - Xamarin/UWP/iOS/Android/Mac project types" -ForegroundColor DarkGray; Write-Host "    - Xamarin.Forms namespace or API usage in source" -ForegroundColor DarkGray }
+    } else {
+        Write-Host "  Readiness score      $score / 100  ($band)"
+        Write-Host "  Confidence           $confidence"
+    }
     Write-Host ("  Findings             {0} critical, {1} high, {2} medium, {3} low" -f $counts.Critical,$counts.High,$counts.Medium,$counts.Low)
-    Write-Host ("  Estimated effort     {0}-{1} developer-days" -f $lowDays,$highDays)
-    Write-Host ("  Projects             {0}" -f $projects.Count)
-    Write-Host ("  Packages evaluated   {0}" -f $packageResults.Count)
+    if (-not $notXamarin) {
+        Write-Host ("  Estimated effort     {0}-{1} developer-days" -f $lowDays,$highDays)
+        Write-Host ("  Projects             {0}" -f $projects.Count)
+        Write-Host ("  Packages evaluated   {0} ({1} unresolved/unknown)" -f $packageResults.Count, $unknownPackages)
+        Write-Host ("  Scan coverage        {0}% ({1} of {2} eligible files scanned)" -f $coveragePct, $scannedTotal, $eligibleTotal)
+        if ($incompleteCoverage) {
+            Write-Host ("    Skipped            {0} oversized, {1} unreadable, {2} excluded by test-project filter" -f ($script:Coverage.OversizedCs+$script:Coverage.OversizedXaml), ($script:Coverage.UnreadableCs+$script:Coverage.UnreadableXaml), ($script:Coverage.ExcludedByTestCs+$script:Coverage.ExcludedByTestXaml)) -ForegroundColor DarkYellow
+        }
+    } else {
+        Write-Host ("  Projects             {0}" -f $projects.Count)
+        Write-Host ("  Packages evaluated   {0}" -f $packageResults.Count)
+    }
     Write-Host ""
 }
 if ($daysToPlay -gt 0) {
-    Write-Host ("  Google Play API 36 deadline: {0} day(s) away (31 Aug 2026; extension to 1 Nov)" -f $daysToPlay) -ForegroundColor Yellow
+    Write-Host ("  Google Play API 36 deadline: {0} day(s) away (31 Aug 2026). Extensions are not automatic - they must be explicitly requested and approved." -f $daysToPlay) -ForegroundColor Yellow
 } elseif ($daysToExt -gt 0) {
-    Write-Host ("  Google Play extension deadline: {0} day(s) away (1 Nov 2026)" -f $daysToExt) -ForegroundColor Red
+    Write-Host ("  Google Play standard deadline has passed. An approved extension would run to 1 Nov 2026 ({0} day(s) away). Extensions are not automatic." -f $daysToExt) -ForegroundColor Red
 } else {
-    Write-Host "  Both Google Play deadlines have passed." -ForegroundColor Red
+    Write-Host "  Both the standard Google Play deadline and its extension window have passed." -ForegroundColor Red
 }
 Write-Host "  App Store: since 28 Apr 2026 uploads require Xcode 26 / iOS 26 SDK. Xamarin cannot build these." -ForegroundColor Yellow
 Write-Host ""
@@ -681,7 +1184,7 @@ if ($SkipReport) { return }
 # ==============================================================================================
 #  HTML REPORT
 # ==============================================================================================
-if (-not $OutputPath) { $OutputPath = Join-Path (Get-Location) 'xamarin-maui-migration-readiness.html' }
+# OutputPath was resolved (and existence checked) during input validation above.
 
 $sevColour = @{ 'Critical'='#c0392b'; 'High'='#d35400'; 'Medium'='#b7950b'; 'Low'='#5d6d7e'; 'Info'='#7f8c8d' }
 $generated = (Get-Date).ToString('d MMMM yyyy, HH:mm')
@@ -697,8 +1200,17 @@ Add-Html @"
 <title>Xamarin Migration Readiness - $(ConvertTo-HtmlText $solName)</title>
 <style>
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{margin:0;background:#f4f6f8;color:#1c2530;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.toc a{display:block;background:#f8fafb;border:1px solid #e6ebef;border-radius:8px;padding:9px 12px;color:#1c2530;text-decoration:none;font-size:13px;font-weight:600}
+.toc a:hover{border-color:#9aa7b3;background:#fff}
+.totop{position:fixed;right:22px;bottom:22px;width:44px;height:44px;border-radius:50%;background:#1c2530;color:#fff;
+  display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:18px;z-index:99;
+  opacity:0;pointer-events:none;transition:opacity .2s;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.totop:hover{background:#33475e}
+.totop.show{opacity:1;pointer-events:auto}
 h1{font-size:24px;margin:0 0 4px;letter-spacing:-.3px}
 .sub{color:#61707f;font-size:13px;margin-bottom:24px}
 .card{background:#fff;border:1px solid #dfe5ea;border-radius:10px;padding:20px;margin-bottom:18px}
@@ -737,7 +1249,9 @@ summary::marker{color:#9aa7b3}
 .foot b{color:#61707f}
 .badge{display:inline-block;padding:1px 7px;border-radius:9px;font-size:10.5px;background:#eef2f5;color:#61707f}
 .verify{background:#fff4d6;color:#8a6d00}
-@media print{body{background:#fff}.card{break-inside:avoid;border-color:#ccc}}
+.obsolete{background:#fde0da;color:#a04000}
+.unverified{background:#e6ebef;color:#61707f}
+@media print{body{background:#fff}.card{break-inside:avoid;border-color:#ccc}.totop{display:none}}
 </style></head><body><div class="wrap">
 <h1>Xamarin to .NET MAUI &mdash; Migration Readiness</h1>
 <div class="sub">$(ConvertTo-HtmlText $solName) &middot; generated $generated &middot; analyser v$script:ToolVersion, rule set $script:RuleSetDate</div>
@@ -747,15 +1261,19 @@ summary::marker{color:#9aa7b3}
 $alertMain = if ($daysToPlay -gt 0) {
     "$daysToPlay days until the Google Play deadline"
 } elseif ($daysToExt -gt 0) {
-    "$daysToExt days until the Google Play extension deadline"
-} else { "Both Google Play deadlines have passed" }
+    "Google Play standard deadline has passed; an approved extension would run to 1 Nov 2026 ($daysToExt days)"
+} else { "Both the standard Google Play deadline and its extension window have passed" }
+
+$asOfNote = if ($script:AsOfDate) {
+    "<br><i>Deadlines computed using a user-supplied -AsOfDate of $([datetime]$script:AsOfDate). Treat as a user-provided assumption, not a system-verified fact.</i>"
+} else { '' }
 
 Add-Html @"
 <div class="alert">
 <div class="big">$alertMain</div>
-<p><b>Google Play:</b> from 31 August 2026, new apps and updates must target Android 16 (API 36); an extension is available to 1 November 2026. Xamarin.Android cannot target API 36.<br>
+<p><b>Google Play:</b> from 31 August 2026, new apps and updates must target Android 16 (API 36). The standard deadline applies by default; any extension must be explicitly requested and approved, and when granted runs to 1 November 2026. Xamarin.Android cannot target API 36.<br>
 <b>App Store:</b> since 28 April 2026, App Store Connect requires builds made with Xcode 26 and the iOS 26 SDK. Xamarin.iOS cannot produce them.<br>
-A Xamarin app is not simply unsupported &mdash; it cannot ship updates to either store.</p>
+A Xamarin app is not simply unsupported &mdash; it cannot ship updates to either store.$asOfNote</p>
 </div>
 "@
 
@@ -777,6 +1295,22 @@ deliberately shows no score and no estimate.</p>
 }
 
 $scoreColour = if ($score -ge 70) { '#1e8449' } elseif ($score -ge 45) { '#b7950b' } elseif ($score -ge 25) { '#d35400' } else { '#c0392b' }
+if ($notXamarin) {
+    Add-Html @"
+<div class="card"><h2>Not a Xamarin project</h2>
+<p>No concrete Xamarin evidence was found in the scanned folder: no <code>Xamarin.*</code> /
+<code>Plugin.*</code> NuGet package references, no Xamarin or UWP project types, and no
+<code>Xamarin.Forms</code> namespace imports or Xamarin-specific API usage in source.</p>
+<p class="fix">A plain .NET project with no findings is <b>not</b> a 100/100 MAUI migration candidate &mdash;
+there is nothing to migrate. If you expected this folder to contain a Xamarin app, check the path and
+re-run. Evidence the scanner looked for:</p>
+<ul class="loc">
+<li>Xamarin.* / Xam.Plugin.* / Plugin.* package references</li>
+<li>Xamarin.Android / Xamarin.iOS / UWP / Xamarin.Mac / tvOS / watchOS project types</li>
+<li>Xamarin.Forms namespace imports and Xamarin-specific API usage in C# source</li>
+</ul></div>
+"@
+} else {
 Add-Html @"
 <div class="card"><div class="hero">
 <div class="score" style="background:$scoreColour"><div class="n">$score</div><div class="l">Readiness</div></div>
@@ -791,11 +1325,31 @@ Add-Html @"
 <div class="kpi"><div class="n">$($counts.Low)</div><div class="l">Low</div></div>
 <div class="kpi"><div class="n">$($projects.Count)</div><div class="l">Projects</div></div>
 <div class="kpi"><div class="n">$($packageResults.Count)</div><div class="l">Packages</div></div>
+<div class="kpi"><div class="n">$confidence</div><div class="l">Confidence</div></div>
+<div class="kpi"><div class="n">$coveragePct%</div><div class="l">Scan coverage</div></div>
 </div></div>
 "@
+}
 
-# ---- Findings by severity ----
-Add-Html '<div class="card"><h2>Findings</h2>'
+# ---- Table of contents ----
+if (-not $notXamarin) {
+    Add-Html '<div class="card" id="toc"><h2>Report contents</h2><div class="toc">'
+    foreach ($t in @('Findings','Projects','NuGet dependencies','Syncfusion control mapping','How the estimate was calculated','Suggested sequence')) {
+        if ($t -eq 'Syncfusion control mapping' -and $syncfusionFound.Count -eq 0) { continue }
+        $id = $t -replace ' ', '-'
+        $extra = if ($t -eq 'Findings' -and $findings.Count -gt 0) { " ($($findings.Count))" }
+                 elseif ($t -eq 'Projects') { " ($($projects.Count))" }
+                 elseif ($t -eq 'NuGet dependencies') { " ($($packageResults.Count))" }
+                 elseif ($t -eq 'Syncfusion control mapping') { " ($($syncfusionFound.Count))" } else { '' }
+        Add-Html "<a href=`"#sec-$id`">$t$extra</a>"
+    }
+    Add-Html '</div>'
+    Add-Html '<p class="muted" style="font-size:12px;margin:10px 0 0">Large reports are easier to navigate from here. Sections are collapsible; the &uarr; button at the bottom-right of every page returns to this list.</p></div>'
+}
+
+# Detail sections below only apply to actual Xamarin projects.
+if (-not $notXamarin) {
+    Add-Html '<div class="card" id="sec-Findings"><h2>Findings</h2>'
 if ($findings.Count -eq 0) {
     Add-Html '<p class="muted">No migration blockers detected. Verify that the scan covered the intended folder, and re-run with -IncludeTestProjects if test projects matter to you.</p>'
 } else {
@@ -815,7 +1369,7 @@ if ($findings.Count -eq 0) {
 Add-Html '</div>'
 
 # ---- Projects ----
-Add-Html '<div class="card"><h2>Projects</h2><table><tr><th style="width:27%">Project</th><th style="width:24%">Type</th><th style="width:15%">Target</th><th style="width:34%">Path</th></tr>'
+Add-Html '<div class="card" id="sec-Projects"><h2>Projects</h2><table><tr><th style="width:27%">Project</th><th style="width:24%">Type</th><th style="width:15%">Target</th><th style="width:34%">Path</th></tr>'
 foreach ($p in ($projects | Sort-Object @{E={$_.Blocking};D=$true}, Name)) {
     $flag = if ($p.Blocking -gt 0) { ' <span class="sev" style="background:#c0392b">not auto-converted</span>' } else { '' }
     Add-Html "<tr><td><b>$(ConvertTo-HtmlText $p.Name)</b>$flag</td><td>$(ConvertTo-HtmlText $p.Kinds)</td><td class=`"mono`">$(ConvertTo-HtmlText $p.Tfm)</td><td class=`"mono loc`">$(ConvertTo-HtmlText $p.Path)</td></tr>"
@@ -823,7 +1377,7 @@ foreach ($p in ($projects | Sort-Object @{E={$_.Blocking};D=$true}, Name)) {
 Add-Html '</table><p class="muted" style="margin-top:12px;font-size:12.5px">Projects flagged <b>not auto-converted</b> are outside what the .NET Upgrade Assistant handles. Budget for these separately &mdash; they are the most commonly underestimated part of a Xamarin migration.</p></div>'
 
 # ---- Packages ----
-Add-Html '<div class="card"><h2>NuGet dependencies</h2><table><tr><th style="width:26%">Package</th><th style="width:11%">Version</th><th style="width:15%">Status</th><th style="width:48%">MAUI path</th></tr>'
+Add-Html '<div class="card" id="sec-NuGet-dependencies"><h2>NuGet dependencies</h2><table><tr><th style="width:26%">Package</th><th style="width:11%">Version</th><th style="width:15%">Status</th><th style="width:48%">MAUI path</th></tr>'
 $statusOrder = @{ 'Blocked'=0;'Replaced'=1;'Check'=2;'Renamed'=3;'Builtin'=4;'Unknown'=5;'Ok'=6 }
 foreach ($p in ($packageResults | Sort-Object @{E={$statusOrder[$_.Status]}}, Id)) {
     $col = $sevColour[$p.Severity]
@@ -837,15 +1391,20 @@ Add-Html '<p class="muted" style="margin-top:12px;font-size:12.5px"><b>Unknown</
 
 # ---- Syncfusion mapping ----
 if ($syncfusionFound.Count -gt 0) {
-    Add-Html '<div class="card"><h2>Syncfusion control mapping</h2><table><tr><th>Xamarin package</th><th>Version</th><th>.NET MAUI package</th></tr>'
-    foreach ($s in ($syncfusionFound | Sort-Object From -Unique)) {
-        Add-Html "<tr><td class=`"mono`">$(ConvertTo-HtmlText $s.From)</td><td class=`"mono loc`">$(ConvertTo-HtmlText $s.Version)</td><td class=`"mono`">$(ConvertTo-HtmlText $s.To)</td></tr>"
+    Add-Html '<div class="card" id="sec-Syncfusion-control-mapping"><h2>Syncfusion control mapping</h2>'
+    Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Each row is classified so a reader can tell what to do next: <b>Exact replacement</b> names the verified MAUI package; <b>Obsolete</b> means no MAUI package exists (use the MAUI built-in or rewrite); <b>Unverified</b> means the control is not in the verified mapping table and must be investigated - do not infer <code>Syncfusion.Maui.&lt;X&gt;</code>.</p>'
+    Add-Html '<table><tr><th>Xamarin package</th><th>Version</th><th>Classification</th><th>.NET MAUI package / action</th></tr>'
+    $kindClass = @{ 'Exact replacement'='verify'; 'Obsolete'='obsolete'; 'Unverified'='unverified' }
+    $ordered = $syncfusionFound | Sort-Object @{E={ switch ($_.Kind) { 'Exact replacement' {0} 'Obsolete' {1} default {2} } }}, From
+    foreach ($s in $ordered) {
+        $cls = $kindClass[$s.Kind]
+        Add-Html "<tr><td class=`"mono`">$(ConvertTo-HtmlText $s.From)</td><td class=`"mono loc`">$(ConvertTo-HtmlText $s.Version)</td><td><span class=`"badge $cls`">$(ConvertTo-HtmlText $s.Kind)</span></td><td class=`"mono`">$(ConvertTo-HtmlText $s.To)</td></tr>"
     }
     Add-Html '</table><p class="muted" style="margin-top:12px;font-size:12.5px">Per-control migration guides: <a href="https://help.syncfusion.com/maui/common/migration">help.syncfusion.com/maui/common/migration</a></p></div>'
 }
 
 # ---- Effort method ----
-Add-Html '<div class="card"><h2>How the estimate was calculated</h2>'
+Add-Html '<div class="card" id="sec-How-the-estimate-was-calculated"><h2>How the estimate was calculated</h2>'
 Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Every number below is shown so you can substitute your own rates. The range applied to the total is &minus;40% to +40%, which reflects how wide real migration outcomes are.</p>'
 Add-Html '<table><tr><th>Work</th><th style="width:70px">Count</th><th style="width:90px">Hours each</th><th style="width:80px">Hours</th></tr>'
 foreach ($e in $effortLines) {
@@ -867,7 +1426,7 @@ score &nbsp;&nbsp;= 100 &times; e<sup>&minus;penalty/scale</sup> = <b>$score</b>
 
 # ---- Next steps ----
 Add-Html @"
-<div class="card"><h2>Suggested sequence</h2>
+<div class="card" id="sec-Suggested-sequence"><h2>Suggested sequence</h2>
 <ol style="margin:0;padding-left:20px;font-size:13.5px;line-height:1.9">
 <li><b>Deal with the projects the Upgrade Assistant will not touch first.</b> UWP heads, iOS extensions and binding projects drive the timeline, and finding them late is what turns an eight-week migration into a five-month one.</li>
 <li><b>Resolve blocked packages before writing any code.</b> A dependency with no MAUI path is an architectural decision, not a porting task.</li>
@@ -878,6 +1437,8 @@ Add-Html @"
 <li><b>Ship to both stores before the deadlines.</b> Store review is not instant; work back from 31 August, or 1 November if you take the Play extension.</li>
 </ol></div>
 "@
+
+}   # end if (-not $notXamarin)
 
 # ---- Errors ----
 if ($scanErrors.Count) {
@@ -894,7 +1455,20 @@ Add-Html @"
 <b>Licence.</b> MIT. Corrections and additional package rules are welcome at <a href="https://github.com/syncfusion/Xamarin-MAUI-Migration-Advisor">github.com/syncfusion/xamarin-migration-advisor</a>.<br>
 <b>About.</b> Built by Syncfusion, which actively contributes to the <a href="https://github.com/dotnet/maui">.NET MAUI open-source project</a> &mdash; including migrating .NET MAUI&rsquo;s own UI test suite from Xamarin.UITest to Appium. <a href="https://devblogs.microsoft.com/dotnet/dotnet-maui-welcomes-syncfusion-open-source-contributions/">Microsoft .NET Blog</a>.
 </div>
-</div></body></html>
+</div>
+<a href="#toc" class="totop" id="totop" title="Back to contents">&uarr;</a>
+<script>
+(function(){
+  var btn = document.getElementById('totop');
+  if(!btn) return;
+  btn.href = '#toc';
+  if (!document.getElementById('toc')) { btn.href = '#'; btn.onclick = function(){ window.scrollTo({top:0,behavior:'smooth'}); return false; }; }
+  window.addEventListener('scroll', function(){
+    if (window.scrollY > 400) { btn.classList.add('show'); } else { btn.classList.remove('show'); }
+  }, {passive:true});
+})();
+</script>
+</body></html>
 "@
 
 $sb.ToString() | Set-Content -LiteralPath $OutputPath -Encoding UTF8
