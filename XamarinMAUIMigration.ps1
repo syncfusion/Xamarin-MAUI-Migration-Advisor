@@ -70,7 +70,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:ToolVersion = '1.1.0'
-$script:RuleSetDate = '2026-08-31'
+$script:RuleSetDate = '2026-09-02'
 $script:AsOfDate   = $AsOfDate
 
 # ---- Input validation ------------------------------------------------------------------------
@@ -244,7 +244,6 @@ $script:SyncfusionMap = [ordered]@{
     'Syncfusion.Xamarin.SfBarcode'         = 'Syncfusion.Maui.Barcode'
     'Syncfusion.Xamarin.SfRangeSlider'     = 'Syncfusion.Maui.Sliders'
     'Syncfusion.Xamarin.SfPullToRefresh'   = 'Syncfusion.Maui.PullToRefresh'
-    # ---- Added 2026-08-31: verified against the official migration table ----
     'Syncfusion.Xamarin.SfAccordion'       = 'Syncfusion.Maui.Expander'
     'Syncfusion.Xamarin.SfAvatarView'      = 'Syncfusion.Maui.Core'
     'Syncfusion.Xamarin.SfBackdropPage'    = 'Syncfusion.Maui.Backdrop'
@@ -265,8 +264,13 @@ $script:SyncfusionMap = [ordered]@{
     'Syncfusion.Xamarin.SfStepProgressBar' = 'Syncfusion.Maui.StepProgressBar'
     'Syncfusion.Xamarin.SfSunburstChart'   = 'Syncfusion.Maui.SunburstChart'
     'Syncfusion.Xamarin.SfTreemap'         = 'Syncfusion.Maui.TreeMap'
-    'Syncfusion.Xamarin.SfSegmentedControl' = 'Syncfusion.Maui.SegmentedControl'
+    'Syncfusion.Xamarin.SfSegmentedControl' = 'Syncfusion.Maui.Buttons'
     'Syncfusion.Xamarin.SfBackdrop'        = 'Syncfusion.Maui.Backdrop'
+
+    'Syncfusion.Xamarin.Data'            = 'Syncfusion.Maui.Data'
+    'Syncfusion.Xamarin.DataSource'      = 'Syncfusion.Maui.DataSource'
+    'Syncfusion.Xamarin.GridCommon'      = 'Syncfusion.Maui.GridCommon'
+    'Syncfusion.Xamarin.Pdf'             = 'Syncfusion.Pdf.NET'
 }
 
 # Obsolete / under-way markers (official migration table). These control packages have
@@ -1343,8 +1347,7 @@ if (-not $notXamarin) {
                  elseif ($t -eq 'Syncfusion control mapping') { " ($($syncfusionFound.Count))" } else { '' }
         Add-Html "<a href=`"#sec-$id`">$t$extra</a>"
     }
-    Add-Html '</div>'
-    Add-Html '<p class="muted" style="font-size:12px;margin:10px 0 0">Large reports are easier to navigate from here. Sections are collapsible; the &uarr; button at the bottom-right of every page returns to this list.</p></div>'
+    Add-Html '</div></div>'
 }
 
 # Detail sections below only apply to actual Xamarin projects.
