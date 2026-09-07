@@ -271,6 +271,8 @@ $script:SyncfusionMap = [ordered]@{
     'Syncfusion.Xamarin.DataSource'      = 'Syncfusion.Maui.DataSource'
     'Syncfusion.Xamarin.GridCommon'      = 'Syncfusion.Maui.GridCommon'
     'Syncfusion.Xamarin.Pdf'             = 'Syncfusion.Pdf.NET'
+    'Syncfusion.Xamarin.PdfiumBindings'  = 'Syncfusion.Maui.PdfViewer'
+    'Syncfusion.Xamarin.Compression'     = 'Syncfusion.Pdf.NET'
 }
 
 # Obsolete / under-way markers (official migration table). These control packages have
