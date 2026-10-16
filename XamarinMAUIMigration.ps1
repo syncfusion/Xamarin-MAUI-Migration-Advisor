@@ -494,9 +494,53 @@ function Resolve-VersionProperty {
     param([string]$Version, [hashtable]$PropertyMap)
     if (-not $Version) { return $null }
     if ($Version -notmatch '\$\(([^)]+)\)') { return $Version }
-    $propName = $Matches[1]
+    # Use a local match, not $Matches: this function is called from inside other
+    # functions that read $Matches right after the call.
+    $m = [regex]::Match($Version, '\$\(([^)]+)\)')
+    if (-not $m.Success) { return $Version }
+    $propName = $m.Groups[1].Value
     if ($PropertyMap -and $PropertyMap.ContainsKey($propName)) { return $PropertyMap[$propName] }
     return $null
+}
+
+# Extract the target framework from project or props file text. Tolerates attributes on
+# the element (<TargetFramework Condition="...">) and resolves $(Property) values where
+# the PropertyMap contains them; otherwise the raw value is returned.
+function Get-TargetFrameworkText {
+    param([string]$Text, [hashtable]$PropertyMap = $null)
+    if (-not $Text) { return '' }
+    $tfm = ''
+    if ($Text -match '<TargetFrameworkVersion\b[^>]*>\s*([^<]+)</TargetFrameworkVersion>') { $tfm = $Matches[1].Trim() }
+    elseif ($Text -match '<TargetFramework(?:s)?\b[^>]*>\s*([^<]+)</TargetFramework(?:s)?>') { $tfm = $Matches[1].Trim() }
+    if ($tfm -and $tfm -match '\$\(') {
+        $resolved = Resolve-VersionProperty -Version $tfm -PropertyMap $PropertyMap
+        if ($resolved) { return $resolved }
+    }
+    return $tfm
+}
+
+# Fallback for projects whose TFM is not in the project file itself (inherited from
+# Directory.Build.props): walk up from the project directory toward the scan root and
+# return the first TFM found.
+function Get-InheritedTargetFramework {
+    param([string]$ProjectDir, [string]$Root, [hashtable]$PropertyMap = $null)
+    $dir = $ProjectDir
+    $r = $Root.TrimEnd('\','/')
+    while ($dir -and $dir.Length -ge $r.Length) {
+        $dbp = Join-Path $dir 'Directory.Build.props'
+        if (Test-Path -LiteralPath $dbp) {
+            $fi = Get-Item -LiteralPath $dbp
+            $text = Get-SafeContent -File $fi -MaxKB $MaxFileSizeKB
+            if ($text) {
+                $tfm = Get-TargetFrameworkText -Text $text -PropertyMap $PropertyMap
+                if ($tfm) { return $tfm }
+            }
+        }
+        $parent = Split-Path $dir -Parent
+        if (-not $parent -or $parent -eq $dir) { break }
+        $dir = $parent
+    }
+    return ''
 }
 
 # Safe XML parser for project/DPM files. Uses XmlReader with ConformanceLevel.Auto and
@@ -711,15 +755,13 @@ foreach ($pf in $projFiles) {
         if (& $sig.Match $text $siblingNames) { [void]$kinds.Add($sig) }
     }
 
-    $tfm = ''
-    if ($text -match '<TargetFrameworkVersion>\s*([^<]+)</TargetFrameworkVersion>') { $tfm = $Matches[1].Trim() }
-    elseif ($text -match '<TargetFramework(?:s)?>\s*([^<]+)</TargetFramework(?:s)?>') { $tfm = $Matches[1].Trim() }
+    $tfm = Get-TargetFrameworkText -Text $text
 
     $rel = Get-RelativePath -FullName $pf.FullName -Root $root
     $kindNames = if ($kinds.Count) { ($kinds | ForEach-Object { $_.Kind }) -join ', ' } else { 'Library / shared' }
 
     [void]$projects.Add([pscustomobject]@{
-        Name = $name; Path = $rel; Kinds = $kindNames; Tfm = $tfm; IsTest = $isTest
+        Name = $name; Path = $rel; Kinds = $kindNames; Tfm = $tfm; IsTest = $isTest; ProjectDir = $pf.DirectoryName
         Blocking = @($kinds | Where-Object { $_.Severity -in @('Critical','High') }).Count
     })
 
@@ -759,11 +801,34 @@ foreach ($dpp in $dppFiles) {
     Add-VersionProperties -Text $dppText -PropertyMap $centralPropertyMap
 }
 
+# Directory.Build.props (and .targets) carry the same kind of properties and are a common
+# home for shared TFM/TFM-adjacent settings, so they feed the resolution map too.
+$dbpFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Include 'Directory.Build.props','Directory.Build.targets' -File -ErrorAction SilentlyContinue |
+    Where-Object { -not (Test-Excluded $_.FullName) })
+foreach ($dbp in $dbpFiles) {
+    $dbpText = Get-SafeContent -File $dbp -MaxKB $MaxFileSizeKB
+    if ($null -eq $dbpText) { continue }
+    Add-VersionProperties -Text $dbpText -PropertyMap $centralPropertyMap
+}
+
 # Also collect version properties from each project file (ProjectGRP, props imported in-tree).
 foreach ($pf in $projFiles) {
     $pfText = Get-SafeContent -File $pf -MaxKB $MaxFileSizeKB
     if ($null -eq $pfText) { continue }
     Add-VersionProperties -Text $pfText -PropertyMap $centralPropertyMap
+}
+
+# Backfill target frameworks now that the central property map is loaded: projects whose
+# csproj carries a $(Property) TFM can be resolved, and projects with no TFM element at
+# all can inherit one from the nearest Directory.Build.props.
+foreach ($p in $projects) {
+    if ($p.Tfm -and $p.Tfm -match '\$\(') {
+        $resolved = Resolve-VersionProperty -Version $p.Tfm -PropertyMap $centralPropertyMap
+        if ($resolved) { $p.Tfm = $resolved }
+    }
+    if (-not $p.Tfm) {
+        $p.Tfm = Get-InheritedTargetFramework -ProjectDir $p.ProjectDir -Root $root -PropertyMap $centralPropertyMap
+    }
 }
 
 # Resolve $(SomePackageVersion) references in recorded versions where possible, and flag
