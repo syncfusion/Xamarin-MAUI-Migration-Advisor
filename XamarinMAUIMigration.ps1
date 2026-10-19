@@ -640,6 +640,70 @@ function Add-VersionProperties {
     } catch { }
 }
 
+# Extract Target Framework Moniker from project file text.
+# Tries XML parsing first, then falls back to regex for robustness.
+# Returns the first/primary framework for multi-targeted projects, or empty string if not found.
+function Get-TargetFrameworkMoniker {
+    param([string]$Text)
+    
+    if (-not $Text) { return '' }
+    
+    # Try XML parsing first (preferred)
+    try {
+        $reader = New-SafeXmlReader -Text $Text
+        while ($reader.Read()) {
+            if ($reader.NodeType -eq [System.Xml.XmlNodeType]::Element) {
+                $localName = $reader.LocalName
+                # Match both TargetFrameworkVersion (legacy) and TargetFramework(s) (modern)
+                if ($localName -in @('TargetFrameworkVersion', 'TargetFramework', 'TargetFrameworks')) {
+                    if (-not $reader.IsEmptyElement) {
+                        $value = $reader.ReadString().Trim()
+                        if ($value) {
+                            # For TargetFrameworks (semicolon-separated), return the first one
+                            $tfm = $value.Split(';')[0].Trim()
+                            if ($tfm) {
+                                $reader.Close()
+                                return $tfm
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        $reader.Close()
+    } catch { }
+    
+    # Fallback to regex patterns if XML parsing fails or finds nothing
+    # Pattern 1: TargetFrameworkVersion (legacy Xamarin projects)
+    if ($Text -match '<TargetFrameworkVersion\s*>\s*([^<\s]+)\s*</TargetFrameworkVersion\s*>') {
+        $tfm = $Matches[1].Trim()
+        if ($tfm) { return $tfm }
+    }
+    
+    # Pattern 2: TargetFramework (modern .NET projects)
+    if ($Text -match '<TargetFramework\s*>\s*([^<\s]+)\s*</TargetFramework\s*>') {
+        $tfm = $Matches[1].Trim()
+        if ($tfm) { return $tfm }
+    }
+    
+    # Pattern 3: TargetFrameworks with multiple values (semicolon-separated)
+    if ($Text -match '<TargetFrameworks\s*>\s*([^<\s]+)\s*</TargetFrameworks\s*>') {
+        $tfm = $Matches[1].Trim()
+        if ($tfm) {
+            # Return the first framework for multi-targeted projects
+            return $tfm.Split(';')[0].Trim()
+        }
+    }
+    
+    # Pattern 4: Legacy attribute-based format (rare but possible in old projects)
+    if ($Text -match '<Project.*?TargetFrameworkVersion\s*=\s*"([^"]+)"') {
+        $tfm = $Matches[1].Trim()
+        if ($tfm) { return $tfm }
+    }
+    
+    return ''
+}
+
 # ==============================================================================================
 #  SCAN
 # ==============================================================================================
@@ -711,9 +775,7 @@ foreach ($pf in $projFiles) {
         if (& $sig.Match $text $siblingNames) { [void]$kinds.Add($sig) }
     }
 
-    $tfm = ''
-    if ($text -match '<TargetFrameworkVersion>\s*([^<]+)</TargetFrameworkVersion>') { $tfm = $Matches[1].Trim() }
-    elseif ($text -match '<TargetFramework(?:s)?>\s*([^<]+)</TargetFramework(?:s)?>') { $tfm = $Matches[1].Trim() }
+    $tfm = Get-TargetFrameworkMoniker -Text $text
 
     $rel = Get-RelativePath -FullName $pf.FullName -Root $root
     $kindNames = if ($kinds.Count) { ($kinds | ForEach-Object { $_.Kind }) -join ', ' } else { 'Library / shared' }
