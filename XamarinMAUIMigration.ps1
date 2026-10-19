@@ -722,7 +722,12 @@ $testProjectRoots = New-Object System.Collections.ArrayList
 
 # ---- Projects ---------------------------------------------------------------------------------
 Write-Step "Enumerating projects..."
-$projFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Include *.csproj,*.fsproj -File -ErrorAction SilentlyContinue |
+# NB: -Filter, not -Include. Get-ChildItem with -Include only filters when the path
+# itself ends in a wildcard; with -LiteralPath it returns every file, which previously
+# populated the Projects table with resources (PNG, XAML, txt) and inflated the score
+# denominator. -Filter matches the file name only, which is what we want here.
+$projFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '*.csproj' -or $_.Name -like '*.fsproj' } |
     Where-Object { -not (Test-Excluded $_.FullName) })
 
 $solutionFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.sln -File -ErrorAction SilentlyContinue |
@@ -803,7 +808,8 @@ foreach ($dpp in $dppFiles) {
 
 # Directory.Build.props (and .targets) carry the same kind of properties and are a common
 # home for shared TFM/TFM-adjacent settings, so they feed the resolution map too.
-$dbpFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Include 'Directory.Build.props','Directory.Build.targets' -File -ErrorAction SilentlyContinue |
+$dbpFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in @('Directory.Build.props','Directory.Build.targets') } |
     Where-Object { -not (Test-Excluded $_.FullName) })
 foreach ($dbp in $dbpFiles) {
     $dbpText = Get-SafeContent -File $dbp -MaxKB $MaxFileSizeKB
