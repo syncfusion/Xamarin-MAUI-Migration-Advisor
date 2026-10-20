@@ -54,26 +54,38 @@ Skipped files: `*.g.cs`, `*.designer.cs`, `*.generated.cs`.
 | .NET 11 blockers | `Microsoft.Maui.Controls.Compatibility` usage |
 | XAML issues | `RelativeLayout`, `Frame`, `TableView`, retired `OnPlatform` targets |
 | Syncfusion mapping | Xamarin → MAUI package mapping where Syncfusion packages are present |
-| Effort estimate | Developer-days, with every rate shown so you can substitute your own |
+| Effort estimate | Optimistic / most-likely / pessimistic developer-days, with every rate shown so you can substitute your own |
 
 Every finding cites the file and line it came from.
 
 ## Readiness score
 
-A 1–100 number measuring **blocker density**, so a large app isn't penalised just for being large:
+A 1–100 number that is the **lower** of two independent components, so it reflects both *how long the migration will take* and *how blocked the codebase is* — neither can hide behind the other:
 
 ```
-penalty = 10×critical + 4×high + 1×medium + 0.2×low
-scale   = 40 + 8×projects + 0.4×sourceFiles
-score   = 100 × e^(−penalty/scale)
+score = min(duration component, risk component)
+
+duration component  = most-likely effort estimate (days) mapped through fixed anchors
+                      days:  0    5   10   15   25   40   60   90
+                      score: 100  85   72   62   50   35   22   15   (linear, floor 15)
+
+risk component      = 100 × 5 / (5 + penalty/scale)
+    penalty = 12×critical + 4×high + 1×medium + 0.15×low
+    scale   = 40 + 8×projects + 0.4×sourceFiles
 ```
+
+The duration component is anchored on real migration outcomes (the 15 days ↔ 62 point was fitted to a ShowCaseSample-scale app completed in ~15 in-scope working days by one experienced developer). The risk component is size-normalised, so a large app isn't penalised just for being large.
 
 | Score | Band |
 |---|---|
 | 70–100 | Straightforward |
-| 45–69 | Moderate |
-| 25–44 | Substantial |
-| 1–24 | Major |
+| 55–69 | Moderate |
+| 40–54 | Substantial |
+| 1–39 | Major |
+
+Any critical finding caps the score at 69 — critical blockers are outside what the .NET Upgrade Assistant converts, so a "Straightforward" result with criticals would be misleading.
+
+The effort estimate behind the duration component reports three figures — **optimistic** (experienced MAUI developer), **most-likely**, and **pessimistic** (first-time MAUI) — instead of an arbitrary percentage band. Per-occurrence work (namespaces, `DependencyService` sites, removed APIs) is priced as a short setup pass plus a small per-item rate, and packages with no MAUI path are priced per package *family*, not per package.
 
 The constants are judgment, not measurement. The report prints the full calculation with your numbers substituted in, so you can disagree and recompute. The same applies to the effort model: every rate is listed line by line.
 
