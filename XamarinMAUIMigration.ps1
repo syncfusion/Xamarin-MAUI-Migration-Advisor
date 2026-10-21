@@ -365,29 +365,34 @@ $script:ProjectSignatures = @(
 )
 
 # ---- Effort model ------------------------------------------------------------------------------
-# Hours per finding. These are medians from published migration write-ups and are deliberately
-# conservative. The report shows the method so a reader can substitute their own numbers.
+# Hours per item as a [low, mid, high] triple. These are medians from published migration
+# write-ups, deliberately conservative, and are fitted against actual completed migrations
+# (e.g. a ShowCaseSample-scale app measured at ~15 working days in-scope for one experienced
+# developer). Per-occurrence lines (namespaces, DI, removed APIs) carry a fixed setup cost plus
+# a small per-item rate, because a developer fixes them in patterns and IDE refactors, not one
+# at a time. The report shows the full method so a reader can substitute their own numbers.
 $script:EffortHours = @{
-    'BaseSetup'        = 16
-    'Renderer'         = 4
-    'Effect'           = 2
-    'DI'               = 0.5
-    'API'              = 0.5
-    'NET11'            = 2
-    'Namespace'        = 0.1
-    'XamlFileHigh'     = 2
-    'XamlFileMedium'   = 1
-    'XamlFileLow'      = 0.25
-    'PackageBlocked'   = 8
-    'PackageReplaced'  = 2
-    'PackageRenamed'   = 1
-    'PackageCheck'     = 1
-    'PackageBuiltin'   = 0.5
-    'ProjectUWP'       = 40
-    'ProjectExtension' = 12
-    'ProjectBinding'   = 8
-    'ProjectOther'     = 16
-    'ProjectHead'      = 4
+    'BaseSetup'        = @(8, 16, 24)
+    'ProjectHead'      = @(2, 4, 6)
+    'ProjectUWP'       = @(24, 40, 60)
+    'ProjectExtension' = @(8, 12, 18)
+    'ProjectBinding'   = @(6, 10, 14)
+    'ProjectOther'     = @(10, 16, 24)
+    'Renderer'         = @(1, 2, 4)
+    'Effect'           = @(1, 2, 3)
+    # Per-occurrence lines: [setup, perItem] at low and high (mid = midpoint).
+    'DI'               = @{ Setup = @(1, 2);       PerItem = @(0.03, 0.08) }
+    'API'              = @{ Setup = @(0, 2);       PerItem = @(0.1, 0.3) }
+    'NET11'            = @{ Setup = @(0, 2);       PerItem = @(0.5, 1.5) }
+    'Namespace'        = @{ Setup = @(0.5, 2);     PerItem = @(0.01, 0.03) }
+    'XamlFileHigh'     = @(1, 2, 3)
+    'XamlFileMedium'   = @(0.5, 1, 1.5)
+    'XamlFileLow'      = @(0.1, 0.25, 0.5)
+    'PackageBlocked'   = @{ FamilySetup = @(2, 4); PerMember = @(0.5, 1) }
+    'PackageReplaced'  = @(1, 2, 3)
+    'PackageRenamed'   = @(0.5, 1, 1.5)
+    'PackageCheck'     = @(0.25, 0.5, 1)
+    'PackageBuiltin'   = @(0.25, 0.5, 1)
 }
 
 # ==============================================================================================
@@ -494,9 +499,53 @@ function Resolve-VersionProperty {
     param([string]$Version, [hashtable]$PropertyMap)
     if (-not $Version) { return $null }
     if ($Version -notmatch '\$\(([^)]+)\)') { return $Version }
-    $propName = $Matches[1]
+    # Use a local match, not $Matches: this function is called from inside other
+    # functions that read $Matches right after the call.
+    $m = [regex]::Match($Version, '\$\(([^)]+)\)')
+    if (-not $m.Success) { return $Version }
+    $propName = $m.Groups[1].Value
     if ($PropertyMap -and $PropertyMap.ContainsKey($propName)) { return $PropertyMap[$propName] }
     return $null
+}
+
+# Extract the target framework from project or props file text. Tolerates attributes on
+# the element (<TargetFramework Condition="...">) and resolves $(Property) values where
+# the PropertyMap contains them; otherwise the raw value is returned.
+function Get-TargetFrameworkText {
+    param([string]$Text, [hashtable]$PropertyMap = $null)
+    if (-not $Text) { return '' }
+    $tfm = ''
+    if ($Text -match '<TargetFrameworkVersion\b[^>]*>\s*([^<]+)</TargetFrameworkVersion>') { $tfm = $Matches[1].Trim() }
+    elseif ($Text -match '<TargetFramework(?:s)?\b[^>]*>\s*([^<]+)</TargetFramework(?:s)?>') { $tfm = $Matches[1].Trim() }
+    if ($tfm -and $tfm -match '\$\(') {
+        $resolved = Resolve-VersionProperty -Version $tfm -PropertyMap $PropertyMap
+        if ($resolved) { return $resolved }
+    }
+    return $tfm
+}
+
+# Fallback for projects whose TFM is not in the project file itself (inherited from
+# Directory.Build.props): walk up from the project directory toward the scan root and
+# return the first TFM found.
+function Get-InheritedTargetFramework {
+    param([string]$ProjectDir, [string]$Root, [hashtable]$PropertyMap = $null)
+    $dir = $ProjectDir
+    $r = $Root.TrimEnd('\','/')
+    while ($dir -and $dir.Length -ge $r.Length) {
+        $dbp = Join-Path $dir 'Directory.Build.props'
+        if (Test-Path -LiteralPath $dbp) {
+            $fi = Get-Item -LiteralPath $dbp
+            $text = Get-SafeContent -File $fi -MaxKB $MaxFileSizeKB
+            if ($text) {
+                $tfm = Get-TargetFrameworkText -Text $text -PropertyMap $PropertyMap
+                if ($tfm) { return $tfm }
+            }
+        }
+        $parent = Split-Path $dir -Parent
+        if (-not $parent -or $parent -eq $dir) { break }
+        $dir = $parent
+    }
+    return ''
 }
 
 # Safe XML parser for project/DPM files. Uses XmlReader with ConformanceLevel.Auto and
@@ -678,7 +727,12 @@ $testProjectRoots = New-Object System.Collections.ArrayList
 
 # ---- Projects ---------------------------------------------------------------------------------
 Write-Step "Enumerating projects..."
-$projFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Include *.csproj,*.fsproj -File -ErrorAction SilentlyContinue |
+# NB: -Filter, not -Include. Get-ChildItem with -Include only filters when the path
+# itself ends in a wildcard; with -LiteralPath it returns every file, which previously
+# populated the Projects table with resources (PNG, XAML, txt) and inflated the score
+# denominator. -Filter matches the file name only, which is what we want here.
+$projFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '*.csproj' -or $_.Name -like '*.fsproj' } |
     Where-Object { -not (Test-Excluded $_.FullName) })
 
 $solutionFiles = @(Get-ChildItem -LiteralPath $root -Recurse -Filter *.sln -File -ErrorAction SilentlyContinue |
@@ -711,15 +765,13 @@ foreach ($pf in $projFiles) {
         if (& $sig.Match $text $siblingNames) { [void]$kinds.Add($sig) }
     }
 
-    $tfm = ''
-    if ($text -match '<TargetFrameworkVersion>\s*([^<]+)</TargetFrameworkVersion>') { $tfm = $Matches[1].Trim() }
-    elseif ($text -match '<TargetFramework(?:s)?>\s*([^<]+)</TargetFramework(?:s)?>') { $tfm = $Matches[1].Trim() }
+    $tfm = Get-TargetFrameworkText -Text $text
 
     $rel = Get-RelativePath -FullName $pf.FullName -Root $root
     $kindNames = if ($kinds.Count) { ($kinds | ForEach-Object { $_.Kind }) -join ', ' } else { 'Library / shared' }
 
     [void]$projects.Add([pscustomobject]@{
-        Name = $name; Path = $rel; Kinds = $kindNames; Tfm = $tfm; IsTest = $isTest
+        Name = $name; Path = $rel; Kinds = $kindNames; Tfm = $tfm; IsTest = $isTest; ProjectDir = $pf.DirectoryName
         Blocking = @($kinds | Where-Object { $_.Severity -in @('Critical','High') }).Count
     })
 
@@ -759,11 +811,35 @@ foreach ($dpp in $dppFiles) {
     Add-VersionProperties -Text $dppText -PropertyMap $centralPropertyMap
 }
 
+# Directory.Build.props (and .targets) carry the same kind of properties and are a common
+# home for shared TFM/TFM-adjacent settings, so they feed the resolution map too.
+$dbpFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in @('Directory.Build.props','Directory.Build.targets') } |
+    Where-Object { -not (Test-Excluded $_.FullName) })
+foreach ($dbp in $dbpFiles) {
+    $dbpText = Get-SafeContent -File $dbp -MaxKB $MaxFileSizeKB
+    if ($null -eq $dbpText) { continue }
+    Add-VersionProperties -Text $dbpText -PropertyMap $centralPropertyMap
+}
+
 # Also collect version properties from each project file (ProjectGRP, props imported in-tree).
 foreach ($pf in $projFiles) {
     $pfText = Get-SafeContent -File $pf -MaxKB $MaxFileSizeKB
     if ($null -eq $pfText) { continue }
     Add-VersionProperties -Text $pfText -PropertyMap $centralPropertyMap
+}
+
+# Backfill target frameworks now that the central property map is loaded: projects whose
+# csproj carries a $(Property) TFM can be resolved, and projects with no TFM element at
+# all can inherit one from the nearest Directory.Build.props.
+foreach ($p in $projects) {
+    if ($p.Tfm -and $p.Tfm -match '\$\(') {
+        $resolved = Resolve-VersionProperty -Version $p.Tfm -PropertyMap $centralPropertyMap
+        if ($resolved) { $p.Tfm = $resolved }
+    }
+    if (-not $p.Tfm) {
+        $p.Tfm = Get-InheritedTargetFramework -ProjectDir $p.ProjectDir -Root $root -PropertyMap $centralPropertyMap
+    }
 }
 
 # Resolve $(SomePackageVersion) references in recorded versions where possible, and flag
@@ -997,12 +1073,26 @@ $counts = [ordered]@{
     Low      = @($findings | Where-Object Severity -eq 'Low').Count
 }
 
-# Effort, built up so each contribution is visible in the report.
+# Effort, built up so each contribution is visible in the report. Each line now carries a
+# [low, mid, high] triple; the mid value is the "most likely" plan and the outer two bound it.
 $effortLines = New-Object System.Collections.ArrayList
 function Add-Effort {
-    param($Label, $Count, $Rate)
+    param($Label, $Count, [double[]]$Triple)
     if ($Count -le 0) { return }
-    [void]$effortLines.Add([pscustomobject]@{ Label=$Label; Count=$Count; Rate=$Rate; Hours=[math]::Round($Count*$Rate,1) })
+    [void]$effortLines.Add([pscustomobject]@{
+        Label=$Label; Count=$Count
+        LowH=[math]::Round($Count*$Triple[0],1); MidH=[math]::Round($Count*$Triple[1],1); HighH=[math]::Round($Count*$Triple[2],1)
+    })
+}
+# Per-occurrence work: a fixed setup cost plus a small per-item rate. A developer fixes these in
+# patterns and IDE refactors, so 79 namespace updates are one pass, not 79 one-off fixes.
+function Add-EffortPerItem {
+    param($Label, $Count, [hashtable]$Shape)
+    if ($Count -le 0) { return }
+    $lowH  = [math]::Round($Shape.Setup[0]  + $Count * $Shape.PerItem[0], 1)
+    $highH = [math]::Round($Shape.Setup[1]  + $Count * $Shape.PerItem[1], 1)
+    $midH  = [math]::Round(($Shape.Setup[0]+$Shape.Setup[1])/2 + $Count * ($Shape.PerItem[0]+$Shape.PerItem[1])/2, 1)
+    [void]$effortLines.Add([pscustomobject]@{ Label=$Label; Count=$Count; LowH=$lowH; MidH=$midH; HighH=$highH })
 }
 
 # A single renderer usually produces two findings (the [assembly: ExportRenderer] registration and
@@ -1026,10 +1116,10 @@ Add-Effort 'Binding projects to recreate'     (@($projects | Where-Object { $_.K
 Add-Effort 'Other unsupported project types'  (@($projects | Where-Object { $_.Kinds -match 'Xamarin\.Mac|tvOS|watchOS' }).Count) $script:EffortHours.ProjectOther
 Add-Effort 'Custom renderers to port'         $rendererFiles $script:EffortHours.Renderer
 Add-Effort 'Platform effects to review'       $effectFiles   $script:EffortHours.Effect
-Add-Effort 'DependencyService call sites'     (Get-CatCount 'DI')       $script:EffortHours.DI
-Add-Effort 'Removed or obsoleted APIs'        (Get-CatCount 'API')      $script:EffortHours.API
-Add-Effort 'Compatibility-namespace work'     (Get-CatCount 'NET11')    $script:EffortHours.NET11
-Add-Effort 'Namespace updates'                (Get-CatCount 'Namespace') $script:EffortHours.Namespace
+Add-EffortPerItem 'DependencyService call sites'     (Get-CatCount 'DI')        $script:EffortHours.DI
+Add-EffortPerItem 'Removed or obsoleted APIs'        (Get-CatCount 'API')       $script:EffortHours.API
+Add-EffortPerItem 'Compatibility-namespace work'     (Get-CatCount 'NET11')     $script:EffortHours.NET11
+Add-EffortPerItem 'Namespace updates'                (Get-CatCount 'Namespace') $script:EffortHours.Namespace
 
 $xamlHigh   = @($findings | Where-Object { $_.Category -eq 'XAML' -and $_.Severity -eq 'High' }).Count
 $xamlMed    = @($findings | Where-Object { $_.Category -eq 'XAML' -and $_.Severity -eq 'Medium' }).Count
@@ -1038,7 +1128,32 @@ Add-Effort 'XAML: high-severity changes'   $xamlHigh $script:EffortHours.XamlFil
 Add-Effort 'XAML: medium-severity changes' $xamlMed  $script:EffortHours.XamlFileMedium
 Add-Effort 'XAML: low-severity changes'    $xamlLow  $script:EffortHours.XamlFileLow
 
-Add-Effort 'Packages with no MAUI path'    (@($packageResults | Where-Object Status -eq 'Blocked').Count)  $script:EffortHours.PackageBlocked
+# Blocked packages are priced per family, not per package: the Android Support libraries share
+# one migration path (AndroidX), and so do most other EOL families. The decision is made once
+# per family; members are mechanical swaps afterwards.
+$blockedPkgs = @($packageResults | Where-Object Status -eq 'Blocked')
+function Get-PackageFamily {
+    param([string]$Id)
+    $id = $Id.ToLower()
+    if ($id -like 'xamarin.android.support*') { return 'Android Support libraries -> AndroidX' }
+    if ($id -like 'xamarin.ffmpeg*')          { return 'Xamarin.FFmpeg family' }
+    if ($id -like 'xamarin.ffimageloading*')  { return 'FFImageLoading family' }
+    if ($id -like 'xamarin.forms*')           { return 'Xamarin.Forms platform packages' }
+    if ($id -like 'xamarin.auth*')            { return 'Xamarin.Auth' }
+    return $Id
+}
+$blockedFamilies = @{}
+foreach ($bp in $blockedPkgs) { $family = Get-PackageFamily $bp.Id; if (-not $blockedFamilies.ContainsKey($family)) { $blockedFamilies[$family] = 0 }; $blockedFamilies[$family]++ }
+$bf = $script:EffortHours.PackageBlocked
+$blockedLow  = [math]::Round($blockedFamilies.Count * $bf.FamilySetup[0] + $blockedPkgs.Count * $bf.PerMember[0], 1)
+$blockedHigh = [math]::Round($blockedFamilies.Count * $bf.FamilySetup[1] + $blockedPkgs.Count * $bf.PerMember[1], 1)
+$blockedMid  = [math]::Round(($blockedFamilies.Count * ($bf.FamilySetup[0]+$bf.FamilySetup[1])/2 + $blockedPkgs.Count * ($bf.PerMember[0]+$bf.PerMember[1])/2), 1)
+if ($blockedPkgs.Count -gt 0) {
+    [void]$effortLines.Add([pscustomobject]@{
+        Label='Packages with no MAUI path'; Count=$blockedPkgs.Count
+        LowH=$blockedLow; MidH=$blockedMid; HighH=$blockedHigh
+    })
+}
 Add-Effort 'Packages to swap'              (@($packageResults | Where-Object Status -eq 'Replaced').Count) $script:EffortHours.PackageReplaced
 Add-Effort 'Packages to rename'            (@($packageResults | Where-Object Status -eq 'Renamed').Count)  $script:EffortHours.PackageRenamed
 Add-Effort 'Packages to verify'            (@($packageResults | Where-Object Status -eq 'Check').Count)    $script:EffortHours.PackageCheck
@@ -1051,31 +1166,72 @@ if ($nothingFound) {
     $effortLines.Clear()
 }
 
-$totalHours = ($effortLines | Measure-Object -Property Hours -Sum).Sum
-if (-not $totalHours) { $totalHours = 0 }
-$lowDays  = [math]::Max(1, [math]::Round(($totalHours * 0.6) / 8, 0))
-$highDays = [math]::Max(2, [math]::Round(($totalHours * 1.4) / 8, 0))
+$totLow  = ($effortLines | Measure-Object -Property LowH  -Sum).Sum; if (-not $totLow)  { $totLow  = 0 }
+$totMid  = ($effortLines | Measure-Object -Property MidH  -Sum).Sum; if (-not $totMid)  { $totMid  = 0 }
+$totHigh = ($effortLines | Measure-Object -Property HighH -Sum).Sum; if (-not $totHigh) { $totHigh = 0 }
+$totalHours = $totMid
+$lowDays  = [math]::Max(1, [math]::Round($totLow  / 8, 0))
+$midDays  = [math]::Max(1, [math]::Round($totMid  / 8, 0))
+$highDays = [math]::Max(1, [math]::Round($totHigh / 8, 0))
 
 # Readiness score.
 #
-# A flat "100 minus penalties" scale bottoms out at zero for any real application, which tells the
-# reader nothing and makes every messy codebase look identical. Instead the penalty is normalised
-# by codebase size and passed through an exponential decay, so the score always differentiates and
-# never quite reaches zero. A large app with many findings is not automatically worse off than a
-# small app with a few - what matters is blocker density.
+# The score is the LOWER of two independent components, so it is never driven by duration
+# alone and never by finding counts alone:
 #
-#   penalty = 10*critical + 4*high + 1*medium + 0.2*low
-#   scale   = 40 + 8*projects + 0.4*sourceFiles
-#   score   = 100 * e^(-penalty/scale)
+#   1. Duration component - the most-likely effort estimate mapped through a fixed scale
+#      (anchored on real migration outcomes; e.g. ~15 working days in-scope for a
+#      ShowCaseSample-scale app by one experienced developer). A long migration reads
+#      lower, full stop.
 #
-# The constants are judgement, not measurement. They are exposed here so a reader can disagree
-# with them and recompute.
-$penalty   = ($counts.Critical * 10) + ($counts.High * 4) + ($counts.Medium * 1) + ($counts.Low * 0.2)
+#      days:     0    5   10   15   25   40   60   90
+#      score:  100   85   72   62   50   35   22   15   (floor 15)
+#
+#   2. Risk component - severity-weighted findings normalised by codebase size, through a
+#      rational (never bottoming out at zero) curve. A short but heavily blocked app
+#      (many criticals, platform heads that cannot auto-convert) still reads low.
+#
+#      riskPenalty = 12*critical + 4*high + 1*medium + 0.15*low
+#      riskScale   = 40 + 8*projects + 0.4*scannedSourceFiles
+#      riskScore   = 100 * K / (K + riskPenalty/riskScale),  K = 5
+#
+#   score = min(durationScore, riskScore)
+#
+# Every constant is judgement, printed in the report so a reader can recompute.
+function Get-DurationScore {
+    param([double]$Days)
+    # [days, score] anchors, piecewise linear
+    $anchors = @(
+        ,@([double]0,  [double]100)
+        ,@([double]5,  [double]85)
+        ,@([double]10, [double]72)
+        ,@([double]15, [double]62)
+        ,@([double]25, [double]50)
+        ,@([double]40, [double]35)
+        ,@([double]60, [double]22)
+        ,@([double]90, [double]15)
+    )
+    if ($Days -le 0) { return 100 }
+    for ($i = 0; $i -lt $anchors.Count - 1; $i++) {
+        $a = $anchors[$i]; $b = $anchors[$i+1]
+        if ($Days -le $b[0]) {
+            $t = ($Days - $a[0]) / ($b[0] - $a[0])
+            return [math]::Round($a[1] + $t * ($b[1] - $a[1]), 1)
+        }
+    }
+    return 15
+}
+$penalty   = ($counts.Critical * 12) + ($counts.High * 4) + ($counts.Medium * 1) + ($counts.Low * 0.15)
 # Use successfully *scanned* (not merely discovered) file counts, so skipped/oversized files
 # do not inflate the size scale and award a higher score (brief section 10).
 $scannedFilesForScale = $script:Coverage.ScannedCs + $script:Coverage.ScannedXaml
 $sizeScale = 40 + (8 * $projects.Count) + (0.4 * $scannedFilesForScale)
 if ($sizeScale -le 0) { $sizeScale = 40 }
+$durationScore = Get-DurationScore $midDays
+$K = 5
+$riskScore = [math]::Round(100 * $K / ($K + $penalty / $sizeScale), 1)
+$score = [math]::Round([math]::Min($durationScore, $riskScore), 0)
+$score = [math]::Max(1, [math]::Min(100, $score))
 
 # ---- Is this actually a Xamarin project? (brief section 8) ----------------------------------
 # Look for concrete Xamarin evidence before producing a readiness score. Without it, a
@@ -1097,9 +1253,6 @@ if ($xamarinApiFindings.Count -gt 0) { $xamarinEvidence += "Source: $($xamarinAp
 
 $isXamarinProject = ($xamarinEvidence.Count -gt 0)
 
-$score = [math]::Round(100 * [math]::Exp(-1 * $penalty / $sizeScale), 0)
-$score = [math]::Max(1, [math]::Min(100, $score))
-
 # If there is no Xamarin evidence, this is not a Xamarin migration candidate. Do not show
 # a 100/100 migration readiness score; surface a 'not a Xamarin project' verdict instead.
 if (-not $isXamarinProject -and -not $nothingFound) {
@@ -1114,8 +1267,8 @@ if ($counts.Critical -gt 0 -and $score -ge 70) {
 }
 $band = if ($notXamarin) { 'Not a Xamarin project' }
        elseif ($score -ge 70) { 'Straightforward' }
-       elseif ($score -ge 45) { 'Moderate' }
-       elseif ($score -ge 25) { 'Substantial' }
+       elseif ($score -ge 55) { 'Moderate' }
+       elseif ($score -ge 40) { 'Substantial' }
        else { 'Major' }
 
 # Deadline maths
@@ -1155,7 +1308,7 @@ else {
     }
     Write-Host ("  Findings             {0} critical, {1} high, {2} medium, {3} low" -f $counts.Critical,$counts.High,$counts.Medium,$counts.Low)
     if (-not $notXamarin) {
-        Write-Host ("  Estimated effort     {0}-{1} developer-days" -f $lowDays,$highDays)
+        Write-Host ("  Estimated effort     {0} (most likely {1}) developer-days" -f "$lowDays-$highDays", $midDays)
         Write-Host ("  Projects             {0}" -f $projects.Count)
         Write-Host ("  Packages evaluated   {0} ({1} unresolved/unknown)" -f $packageResults.Count, $unknownPackages)
         Write-Host ("  Scan coverage        {0}% ({1} of {2} eligible files scanned)" -f $coveragePct, $scannedTotal, $eligibleTotal)
@@ -1294,7 +1447,7 @@ deliberately shows no score and no estimate.</p>
     return
 }
 
-$scoreColour = if ($score -ge 70) { '#1e8449' } elseif ($score -ge 45) { '#b7950b' } elseif ($score -ge 25) { '#d35400' } else { '#c0392b' }
+$scoreColour = if ($score -ge 70) { '#1e8449' } elseif ($score -ge 55) { '#b7950b' } elseif ($score -ge 40) { '#d35400' } else { '#c0392b' }
 if ($notXamarin) {
     Add-Html @"
 <div class="card"><h2>Not a Xamarin project</h2>
@@ -1316,7 +1469,7 @@ Add-Html @"
 <div class="score" style="background:$scoreColour"><div class="n">$score</div><div class="l">Readiness</div></div>
 <div class="herotext">
 <div class="band">$band migration</div>
-<p>Estimated at <b>$lowDays&ndash;$highDays developer-days</b> for the framework migration itself. This covers porting what exists; it excludes new features, redesign, QA cycles and store resubmission. The calculation is shown in full further down.</p>
+<p>Estimated at <b>$midDays developer-days</b> most likely (range <b>$lowDays&ndash;$highDays</b>) for the framework migration itself. This covers porting what exists; it excludes new features, redesign, QA cycles and store resubmission. The calculation is shown in full further down.</p>
 </div></div>
 <div class="kpis">
 <div class="kpi"><div class="n" style="color:#c0392b">$($counts.Critical)</div><div class="l">Critical</div></div>
@@ -1405,23 +1558,29 @@ if ($syncfusionFound.Count -gt 0) {
 
 # ---- Effort method ----
 Add-Html '<div class="card" id="sec-How-the-estimate-was-calculated"><h2>How the estimate was calculated</h2>'
-Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Every number below is shown so you can substitute your own rates. The range applied to the total is &minus;40% to +40%, which reflects how wide real migration outcomes are.</p>'
-Add-Html '<table><tr><th>Work</th><th style="width:70px">Count</th><th style="width:90px">Hours each</th><th style="width:80px">Hours</th></tr>'
+Add-Html '<p class="muted" style="font-size:12.5px;margin-top:0">Every number below is shown so you can substitute your own rates. Each line has three figures: <b>optimistic</b> (experienced MAUI developer, clean build), <b>most likely</b>, and <b>pessimistic</b> (first-time MAUI, platform surprises). Per-occurrence work (namespaces, DI call sites, removed APIs) is priced as a short setup pass plus a small per-item rate, because a developer fixes these in patterns, not one by one. Blocked packages are priced per package <i>family</i>: the migration path is decided once per family, then applied mechanically to each member.</p>'
+Add-Html '<table><tr><th>Work</th><th style="width:70px">Count</th><th style="width:90px">Optimistic h</th><th style="width:90px">Most likely h</th><th style="width:90px">Pessimistic h</th></tr>'
 foreach ($e in $effortLines) {
-    Add-Html "<tr><td>$(ConvertTo-HtmlText $e.Label)</td><td class=`"mono`">$($e.Count)</td><td class=`"mono loc`">$($e.Rate)</td><td class=`"mono`">$($e.Hours)</td></tr>"
+    Add-Html "<tr><td>$(ConvertTo-HtmlText $e.Label)</td><td class=`"mono`">$($e.Count)</td><td class=`"mono loc`">$($e.LowH)</td><td class=`"mono`">$($e.MidH)</td><td class=`"mono loc`">$($e.HighH)</td></tr>"
 }
-Add-Html "<tr><td><b>Total</b></td><td></td><td></td><td class=`"mono`"><b>$totalHours</b></td></tr>"
-Add-Html "</table><p style=`"margin-top:12px`"><b>$totalHours hours</b> &rarr; $([math]::Round($totalHours/8,1)) developer-days &rarr; reported range <b>$lowDays&ndash;$highDays days</b> at &plusmn;40%.</p>"
+Add-Html "<tr><td><b>Total</b></td><td></td><td class=`"mono loc`"><b>$totLow</b></td><td class=`"mono`"><b>$totMid</b></td><td class=`"mono loc`"><b>$totHigh</b></td></tr>"
+Add-Html "</table><p style=`"margin-top:12px`"><b>$totLow&ndash;$totHigh hours</b> &rarr; <b>$lowDays&ndash;$highDays developer-days</b>, most likely <b>$midDays days ($totMid hours)</b> at 8h/day.</p>"
 Add-Html '<h3>What this excludes</h3><p class="fix">New features, UI redesign, QA and regression cycles, store resubmission and review, team ramp-up on MAUI, and any backend work. It also assumes the app currently builds.</p>'
 Add-Html @"
 <h3>And how the readiness score was calculated</h3>
-<p class="fix">The score measures blocker <i>density</i>, so a large application is not penalised simply for being large:</p>
+<p class="fix">The score is the <b>lower</b> of two independent components, so it reflects both <i>how long the migration will take</i> and <i>how blocked the codebase is</i> &mdash; neither can hide behind the other:</p>
 <p class="mono" style="background:#f8fafb;border:1px solid #e6ebef;border-radius:6px;padding:11px 13px;font-size:12px">
-penalty = (10 &times; $($counts.Critical)) + (4 &times; $($counts.High)) + (1 &times; $($counts.Medium)) + (0.2 &times; $($counts.Low)) = <b>$penalty</b><br>
-scale &nbsp;&nbsp;= 40 + (8 &times; $($projects.Count) projects) + (0.4 &times; $($csFiles.Count + $xamlFiles.Count) source files) = <b>$sizeScale</b><br>
-score &nbsp;&nbsp;= 100 &times; e<sup>&minus;penalty/scale</sup> = <b>$score</b>
+<b>1. Duration component</b> (from the most-likely estimate above):<br>
+days: &nbsp;0&nbsp;&nbsp;5&nbsp;&nbsp;10&nbsp;&nbsp;15&nbsp;&nbsp;25&nbsp;&nbsp;40&nbsp;&nbsp;60&nbsp;&nbsp;90<br>
+score: &nbsp;100&nbsp;85&nbsp;&nbsp;72&nbsp;&nbsp;62&nbsp;&nbsp;50&nbsp;&nbsp;35&nbsp;&nbsp;22&nbsp;&nbsp;15 &nbsp;(linear between anchors, floor 15)<br>
+most-likely estimate = <b>$midDays days</b> &rarr; duration score <b>$durationScore</b><br><br>
+<b>2. Risk component</b> (severity-weighted findings, normalised by codebase size):<br>
+riskPenalty = (12 &times; $($counts.Critical)) + (4 &times; $($counts.High)) + (1 &times; $($counts.Medium)) + (0.15 &times; $($counts.Low)) = <b>$penalty</b><br>
+riskScale &nbsp;&nbsp; = 40 + (8 &times; $($projects.Count) projects) + (0.4 &times; $scannedFilesForScale source files) = <b>$sizeScale</b><br>
+risk score &nbsp;&nbsp; = 100 &times; 5 / (5 + penalty/scale) = <b>$riskScore</b><br><br>
+<b>score = min($durationScore, $riskScore) = $score</b>
 </p>
-<p class="fix">Those constants are judgement rather than measurement. They are printed here so you can disagree with them and recompute.</p></div>
+<p class="fix">Why a minimum, not a blend: a short but heavily blocked migration is no less risky than a long mechanical one, and a long low-risk one still takes time. Every constant is judgement rather than measurement; they are printed here so you can disagree with them and recompute. The 15 days &harr; 62 anchor is fitted against a real migration: a ShowCaseSample-scale app completed in about 15 in-scope working days by one experienced developer.</p></div>
 "@
 
 # ---- Next steps ----
